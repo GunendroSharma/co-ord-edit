@@ -137,10 +137,19 @@ export function ProductEdit() {
   const setVar = (i, patch) => setP({ ...p, variants: p.variants.map((v, j) => (j === i ? { ...v, ...patch } : v)) });
   const rmVar = (i) => setP({ ...p, variants: p.variants.filter((_, j) => j !== i) });
   const addMediaUrl = async () => {
-    const url = window.prompt("Image URL");
+    const url = window.prompt("Paste an image URL (.jpg/.png) or video URL (.mp4/.mov)");
     if (!url) return;
-    const { data } = await api.post("/imagekit/mock-upload", { url, filename: `img-${Date.now()}.jpg` });
-    setP({ ...p, media: [...p.media, { file_id: data.fileId, url: data.url, thumbnail_url: data.thumbnailUrl, kind: "image", tag: "product", is_primary: p.media.length === 0 }] });
+    const isVid = /\.(mp4|mov|webm|ogg|m4v)(\?|$)/i.test(url.split("?")[0]);
+    const ext = url.split("?")[0].split(".").pop() || (isVid ? "mp4" : "jpg");
+    const { data } = await api.post("/imagekit/mock-upload", { url, filename: `media-${Date.now()}.${ext}` });
+    setP({ ...p, media: [...p.media, {
+      file_id: data.fileId,
+      url: data.url,
+      thumbnail_url: data.thumbnailUrl,
+      kind: data.kind || (isVid ? "video" : "image"),
+      tag: isVid ? "reel" : "product",
+      is_primary: p.media.length === 0 && !isVid,
+    }] });
   };
   const rmMedia = (i) => setP({ ...p, media: p.media.filter((_, j) => j !== i) });
   const save = async () => {
@@ -174,11 +183,16 @@ export function ProductEdit() {
             </div>
           </div>
           <div className="bg-white border rounded-md p-4">
-            <div className="flex justify-between mb-3"><b className="text-sm">Media</b><button onClick={addMediaUrl} className="text-xs underline" data-testid="pe-add-media">+ Add image URL (ImageKit mock upload)</button></div>
+            <div className="flex justify-between mb-3"><b className="text-sm">Media</b><button onClick={addMediaUrl} className="text-xs underline" data-testid="pe-add-media">+ Add image or video URL (auto-detects .mp4)</button></div>
             <div className="grid grid-cols-4 gap-3">
               {p.media.map((m, i) => (
                 <div key={i} className="relative">
-                  <img src={m.url} alt="" className="w-full aspect-square object-cover" />
+                  {m.kind === "video" ? (
+                    <video src={m.url} muted playsInline loop preload="none" controls className="w-full aspect-square object-cover bg-zinc-100" />
+                  ) : (
+                    <img src={m.url} alt="" className="w-full aspect-square object-cover" />
+                  )}
+                  <span className={`absolute top-1 left-1 text-[10px] px-1.5 py-0.5 rounded-full ${m.kind === "video" ? "bg-black/70 text-white" : "bg-white/80"}`}>{m.kind || "image"}</span>
                   <button onClick={() => rmMedia(i)} className="absolute top-1 right-1 bg-white/90 text-xs px-1">✕</button>
                 </div>
               ))}

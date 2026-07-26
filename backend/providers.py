@@ -34,12 +34,16 @@ class ImageKitProvider:
         """Stub upload used when MOCK_MODE=True. Returns imagekit-shaped payload."""
         fid = f"mock_{uuid.uuid4().hex[:12]}"
         url = remote_url or f"{settings.IMAGEKIT_URL_ENDPOINT}mock/{fid}/{filename}"
+        lower = (filename or url or "").lower().split("?")[0]
+        is_video = any(lower.endswith(ext) for ext in (".mp4", ".mov", ".webm", ".ogg", ".m4v"))
         return {
             "fileId": fid,
             "url": url,
             "thumbnailUrl": url,
             "name": filename,
             "filePath": f"/mock/{fid}",
+            "kind": "video" if is_video else "image",
+            "fileType": "video" if is_video else "image",
         }
 
     def delete_file(self, file_id: str):

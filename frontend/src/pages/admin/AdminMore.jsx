@@ -5,24 +5,38 @@ import { toast } from "sonner";
 export function Media() {
   const [url, setUrl] = useState("");
   const [uploads, setUploads] = useState(() => JSON.parse(localStorage.getItem("lp_media_log") || "[]"));
+  const isVideoUrl = (u = "") => /\.(mp4|mov|webm|ogg|m4v)(\?|$)/i.test(u.split("?")[0]);
   const upload = async (e) => {
     e.preventDefault();
-    const { data } = await api.post("/imagekit/mock-upload", { url, filename: `media-${Date.now()}.jpg` });
-    const next = [{ ...data, url: data.url }, ...uploads];
+    const kind = isVideoUrl(url) ? "video" : "image";
+    const ext = url.split("?")[0].split(".").pop() || (kind === "video" ? "mp4" : "jpg");
+    const { data } = await api.post("/imagekit/mock-upload", { url, filename: `media-${Date.now()}.${ext}` });
+    const entry = { ...data, kind: data.kind || kind };
+    const next = [entry, ...uploads];
     setUploads(next); localStorage.setItem("lp_media_log", JSON.stringify(next));
-    setUrl(""); toast.success("Uploaded to ImageKit (mock)");
+    setUrl(""); toast.success(`${kind === "video" ? "Video" : "Image"} uploaded to ImageKit (mock)`);
   };
   return (
     <div data-testid="admin-media">
       <h1 className="text-2xl font-admin-head mb-2">Media Library</h1>
-      <p className="text-sm text-zinc-500 mb-6">In MOCK_MODE, paste any image URL to simulate ImageKit upload. In production, direct browser upload with signed auth is used.</p>
+      <p className="text-sm text-zinc-500 mb-6">Paste any <b>image or MP4 URL</b> to simulate ImageKit upload. Videos automatically feed the PDP Reels rail when attached to a product.</p>
       <form onSubmit={upload} className="flex gap-2 mb-6" data-testid="media-upload">
-        <input type="url" required placeholder="https://…image.jpg" value={url} onChange={(e) => setUrl(e.target.value)} className="flex-1 border rounded-md px-3 py-2 text-sm" data-testid="media-url" />
+        <input type="url" required placeholder="https://…image.jpg or https://…styling-reel.mp4" value={url} onChange={(e) => setUrl(e.target.value)} className="flex-1 border rounded-md px-3 py-2 text-sm" data-testid="media-url" />
         <button className="bg-zinc-900 text-white text-sm px-4 rounded-md" data-testid="media-upload-btn">Upload</button>
       </form>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {uploads.map((m, i) => (
-          <div key={i} className="bg-white border rounded-md overflow-hidden"><img src={m.url} className="aspect-square w-full object-cover" alt="" /><div className="p-2 text-xs truncate">{m.fileId}</div></div>
+          <div key={i} className="bg-white border rounded-md overflow-hidden" data-testid={`media-item-${i}`}>
+            <div className="aspect-square bg-zinc-100 relative">
+              {m.kind === "video" ? (
+                <video src={m.url} muted playsInline loop preload="none" controls className="w-full h-full object-cover" />
+              ) : (
+                <img src={m.url} className="w-full h-full object-cover" alt="" loading="lazy" />
+              )}
+              <span className={`absolute top-1 left-1 text-[10px] px-1.5 py-0.5 rounded-full ${m.kind === "video" ? "bg-black/70 text-white" : "bg-white/80"}`}>{m.kind || "image"}</span>
+            </div>
+            <div className="p-2 text-xs truncate">{m.fileId}</div>
+          </div>
         ))}
       </div>
     </div>
