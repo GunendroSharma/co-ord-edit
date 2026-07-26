@@ -1,0 +1,13 @@
+{
+  "short_name": "Loom & Pastel",
+  "name": "Loom & Pastel Co.",
+  "description": "Hand-embroidered co-ord sets & slow-fashion pieces for the modern woman.",
+  "icons": [
+    { "src": "favicon.ico", "sizes": "64x64 32x32 24x24 16x16", "type": "image/x-icon" }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#2C2A29",
+  "background_color": "#FAFAF9",
+  "orientation": "portrait"
+}
