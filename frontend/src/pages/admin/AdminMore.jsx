@@ -107,7 +107,11 @@ export function Pages() {
 
 export function Analytics() {
   const [k, setK] = useState(null);
-  useEffect(() => { api.get("/admin/analytics").then((r) => setK(r.data)); }, []);
+  const [reels, setReels] = useState(null);
+  useEffect(() => {
+    api.get("/admin/analytics").then((r) => setK(r.data));
+    api.get("/admin/analytics/reels").then((r) => setReels(r.data));
+  }, []);
   return (
     <div data-testid="admin-analytics">
       <h1 className="text-2xl font-admin-head mb-6">Analytics</h1>
@@ -117,7 +121,7 @@ export function Analytics() {
         <div className="bg-white border rounded-md p-4"><div className="text-xs text-zinc-500">Customers</div><div className="text-2xl font-admin-head mt-1">{k?.kpi?.customers}</div></div>
         <div className="bg-white border rounded-md p-4"><div className="text-xs text-zinc-500">AOV</div><div className="text-2xl font-admin-head mt-1">₹{(k?.kpi?.avg_order_value || 0).toLocaleString("en-IN")}</div></div>
       </div>
-      <div className="bg-white border rounded-md p-5">
+      <div className="bg-white border rounded-md p-5 mb-8">
         <b className="text-sm">Sales by day (last 60)</b>
         <div className="flex items-end gap-1 h-40 mt-4">
           {(k?.sales_by_day || []).map((d, i) => {
@@ -127,6 +131,47 @@ export function Analytics() {
           })}
           {(k?.sales_by_day || []).length === 0 && <div className="text-sm text-zinc-500">No sales data yet.</div>}
         </div>
+      </div>
+
+      {/* Reel performance */}
+      <div className="bg-white border rounded-md p-5" data-testid="reel-analytics">
+        <div className="flex justify-between items-baseline mb-3">
+          <b className="text-sm">Reel performance</b>
+          <div className="text-xs text-zinc-500">
+            {reels?.total?.impressions || 0} impressions · {reels?.total?.adds || 0} adds · <b className="text-emerald-700">{reels?.total?.cvr || 0}% CVR</b>
+          </div>
+        </div>
+        {(!reels || reels.rows.length === 0) ? (
+          <p className="text-sm text-zinc-500 py-4">No reel activity yet. Views and one-tap add-to-bags will appear here as shoppers browse product pages.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b bg-zinc-50 text-left">
+                <tr>
+                  <th className="p-3">Product</th>
+                  <th className="p-3">Impressions</th>
+                  <th className="p-3">One-tap adds</th>
+                  <th className="p-3">CVR</th>
+                  <th className="p-3">Performance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reels.rows.map((r) => {
+                  const max = Math.max(...reels.rows.map((x) => x.adds), 1);
+                  return (
+                    <tr key={r.reel_id + r.product_slug} className="border-b" data-testid={`reel-row-${r.product_slug}`}>
+                      <td className="p-3">{r.title}</td>
+                      <td className="p-3">{r.impressions.toLocaleString("en-IN")}</td>
+                      <td className="p-3 font-medium">{r.adds.toLocaleString("en-IN")}</td>
+                      <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-xs ${r.cvr >= 5 ? "bg-emerald-100 text-emerald-800" : r.cvr >= 2 ? "bg-amber-100 text-amber-800" : "bg-zinc-100 text-zinc-700"}`}>{r.cvr}%</span></td>
+                      <td className="p-3"><div className="w-40 h-2 bg-zinc-100 rounded-full overflow-hidden"><div className="h-full bg-zinc-900" style={{ width: `${(r.adds / max) * 100}%` }} /></div></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

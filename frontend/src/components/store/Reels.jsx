@@ -1,9 +1,30 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, API_BASE } from "@/lib/api";
 import { useCart } from "@/lib/cart";
 import { Play, Plus, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
+
+// Session ID for deduping impressions
+const SID = (() => {
+  let s = sessionStorage.getItem("lp_sid");
+  if (!s) { s = Math.random().toString(36).slice(2) + Date.now().toString(36); sessionStorage.setItem("lp_sid", s); }
+  return s;
+})();
+
+// Track events with sendBeacon for zero UI blocking
+function trackReel(event, reel) {
+  try {
+    const payload = JSON.stringify({ events: [{
+      event, reel_id: reel.id, product_id: reel.product.id, product_slug: reel.product.slug, session_id: SID,
+    }] });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(`${API_BASE}/reels/track`, new Blob([payload], { type: "application/json" }));
+    } else {
+      fetch(`${API_BASE}/reels/track`, { method: "POST", body: payload, headers: { "Content-Type": "application/json" }, keepalive: true }).catch(() => {});
+    }
+  } catch {}
+}
 
 /**
  * Performance-first reels:
@@ -50,6 +71,7 @@ export function Reels({ slug }) {
 function ReelCard({ reel }) {
   const rootRef = useRef(null);
   const videoRef = useRef(null);
+  const impressionSent = useRef(false);
   const [inView, setInView] = useState(false);
   const [adding, setAdding] = useState(false);
   const { addItem } = useCart();
@@ -61,13 +83,21 @@ function ReelCard({ reel }) {
     if (!el) return;
     const obs = new IntersectionObserver(
       (entries) => {
-        entries.forEach((e) => setInView(e.isIntersecting && e.intersectionRatio >= 0.6));
+        entries.forEach((e) => {
+          const visible = e.isIntersecting && e.intersectionRatio >= 0.6;
+          setInView(visible);
+          // Fire one impression per session per reel when first ≥60% visible
+          if (visible && !impressionSent.current) {
+            impressionSent.current = true;
+            trackReel("impression", reel);
+          }
+        });
       },
       { threshold: [0, 0.6, 1] }
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, []);
+  }, [reel]);
 
   // Video play/pause + src (un)mounting driven purely by intersection & motion preference.
   useEffect(() => {
@@ -88,6 +118,7 @@ function ReelCard({ reel }) {
     e.preventDefault();
     e.stopPropagation();
     setAdding(true);
+    trackReel("add_to_bag", reel);
     try {
       // Fetch a variant if we don't have one (fallback for products where variant_id missing)
       let p = reel.product;

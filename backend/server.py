@@ -257,6 +257,66 @@ _REELS_TITLES = [
 ]
 
 
+@api.post("/reels/track")
+async def reels_track(body: dict):
+    """Log a reel impression or one-tap add-to-bag conversion.
+    Body: { events: [{reel_id, product_id, product_slug, event, session_id}] }
+    """
+    events = body.get("events") or []
+    if not events:
+        return {"ok": True, "count": 0}
+    docs = []
+    for e in events[:50]:
+        ev = e.get("event")
+        if ev not in ("impression", "add_to_bag"):
+            continue
+        docs.append({
+            "reel_id": e.get("reel_id", ""),
+            "product_id": e.get("product_id", ""),
+            "product_slug": e.get("product_slug", ""),
+            "event": ev,
+            "session_id": e.get("session_id", ""),
+            "ts": _now(),
+        })
+    if docs:
+        await db.reel_events.insert_many(docs)
+    return {"ok": True, "count": len(docs)}
+
+
+@api.get("/admin/analytics/reels")
+async def admin_reel_analytics(user=Depends(require_staff)):
+    pipeline = [
+        {"$group": {
+            "_id": {"reel_id": "$reel_id", "product_slug": "$product_slug", "event": "$event"},
+            "n": {"$sum": 1},
+        }},
+    ]
+    rows = await db.reel_events.aggregate(pipeline).to_list(2000)
+    per_reel: dict = {}
+    for r in rows:
+        k = (r["_id"]["reel_id"], r["_id"]["product_slug"])
+        d = per_reel.setdefault(k, {"reel_id": k[0], "product_slug": k[1], "impressions": 0, "adds": 0})
+        if r["_id"]["event"] == "impression":
+            d["impressions"] += r["n"]
+        elif r["_id"]["event"] == "add_to_bag":
+            d["adds"] += r["n"]
+    # Enrich with product titles
+    slugs = list({v["product_slug"] for v in per_reel.values() if v["product_slug"]})
+    prods = {p["slug"]: p["title"] for p in await db.products.find({"slug": {"$in": slugs}}, {"_id": 0, "slug": 1, "title": 1}).to_list(500)}
+    out = []
+    for v in per_reel.values():
+        v["title"] = prods.get(v["product_slug"], v["product_slug"])
+        v["cvr"] = round((v["adds"] / v["impressions"]) * 100, 1) if v["impressions"] else 0.0
+        out.append(v)
+    out.sort(key=lambda x: (-x["adds"], -x["impressions"]))
+    total = {
+        "impressions": sum(v["impressions"] for v in out),
+        "adds": sum(v["adds"] for v in out),
+    }
+    total["cvr"] = round((total["adds"] / total["impressions"]) * 100, 1) if total["impressions"] else 0.0
+    return {"rows": out, "total": total}
+
+
 @api.get("/reels")
 async def reels(slug: Optional[str] = None):
     """Return short styling reels. If ?slug=... pin the base product first."""
