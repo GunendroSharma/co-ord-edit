@@ -19,12 +19,21 @@ export default function Checkout() {
   useEffect(() => {
     if (address.email && address.email.includes("@")) localStorage.setItem("lp_shopper_email", address.email);
   }, [address.email]);
-  const [couponCode, setCouponCode] = useState("");
+  const [couponCode, setCouponCode] = useState(() => localStorage.getItem("lp_auto_coupon") || "");
   const [paymentMethod, setPaymentMethod] = useState("razorpay");
   const [giftWrap, setGiftWrap] = useState(false);
   const [giftNote, setGiftNote] = useState("");
   const [quote, setQuote] = useState(null);
   const [placing, setPlacing] = useState(false);
+
+  // If a coupon was auto-set (e.g. from bundle), show a toast then clear the storage flag
+  useEffect(() => {
+    const auto = localStorage.getItem("lp_auto_coupon");
+    if (auto) {
+      toast.success(`Coupon ${auto} applied to your bundle`, { duration: 5000 });
+      localStorage.removeItem("lp_auto_coupon");
+    }
+  }, []);
 
   const refreshQuote = async () => {
     if (items.length === 0) return;

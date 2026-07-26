@@ -210,6 +210,38 @@ async def get_product(slug: str):
     return {"product": _clean(p), "related": _clean(related)}
 
 
+@api.get("/products/{slug}/bundle")
+async def get_bundle(slug: str):
+    """Return 'complete the set' companions: pieces from the same collection but a different category."""
+    base = await db.products.find_one({"slug": slug}, _proj())
+    if not base:
+        raise HTTPException(404, "Product not found")
+    query = {"id": {"$ne": base["id"]}, "status": "active"}
+    if base.get("collection_ids"):
+        query["collection_ids"] = {"$in": base["collection_ids"]}
+    # Prefer a different category first for genuine "complete the look" logic
+    companions = await db.products.find({**query, "category": {"$ne": base.get("category")}}, _proj()).limit(2).to_list(2)
+    if len(companions) < 2:
+        # Fallback: any other active pieces
+        extras = await db.products.find({"id": {"$ne": base["id"]}, "status": "active"}, _proj()).limit(4).to_list(4)
+        seen = {c["id"] for c in companions}
+        for e in extras:
+            if e["id"] not in seen and len(companions) < 2:
+                companions.append(e); seen.add(e["id"])
+    base_price = (base.get("variants") or [{}])[0].get("price", 0)
+    total_before = base_price + sum((c.get("variants") or [{}])[0].get("price", 0) for c in companions)
+    total_after = round(total_before * 0.9, 2)
+    return {
+        "base": _clean(base),
+        "companions": _clean(companions),
+        "bundle_code": "BUNDLE10",
+        "discount_pct": 10,
+        "total_before": round(total_before, 2),
+        "total_after": total_after,
+        "you_save": round(total_before - total_after, 2),
+    }
+
+
 @api.get("/collections")
 async def list_collections():
     return _clean(await db.collections.find({}, _proj()).to_list(100))

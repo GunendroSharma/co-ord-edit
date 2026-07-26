@@ -9,6 +9,7 @@ import { Heart, Star } from "lucide-react";
 import { toast } from "sonner";
 import { ProductTile } from "./Home";
 import { SizeChartTrigger } from "@/components/store/SizeChart";
+import { CompleteTheSet } from "@/components/store/CompleteTheSet";
 
 export default function ProductDetail() {
   const { slug } = useParams();
@@ -170,13 +171,14 @@ export default function ProductDetail() {
 
       {/* Related */}
       {data.related?.length > 0 && (
-        <section className="max-w-7xl mx-auto px-6 pb-24">
+        <section className="max-w-7xl mx-auto px-6 pb-16">
           <h3 className="font-serif-display text-3xl mb-8">You may also love</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {data.related.map((p) => <ProductTile key={p.id} p={p} />)}
           </div>
         </section>
       )}
+      <CompleteTheSet slug={slug} />
       <StoreFooter />
     </div>
   );

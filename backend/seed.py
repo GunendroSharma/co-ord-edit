@@ -138,6 +138,7 @@ async def run():
         {"code": "HELLO10", "kind": "percent", "value": 10, "min_cart": 0, "active": True},
         {"code": "FLAT500", "kind": "flat", "value": 500, "min_cart": 2999, "active": True},
         {"code": "FREESHIP", "kind": "free_shipping", "value": 0, "min_cart": 1499, "active": True},
+        {"code": "BUNDLE10", "kind": "percent", "value": 10, "min_cart": 0, "active": True},
     ]:
         if not await db.coupons.find_one({"code": c["code"]}):
             await db.coupons.insert_one(Coupon(**c).model_dump())
