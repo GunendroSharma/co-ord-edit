@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { ProductTile } from "./Home";
 import { SizeChartTrigger } from "@/components/store/SizeChart";
 import { CompleteTheSet } from "@/components/store/CompleteTheSet";
+import { Reels } from "@/components/store/Reels";
 
 export default function ProductDetail() {
   const { slug } = useParams();
@@ -179,6 +180,7 @@ export default function ProductDetail() {
         </section>
       )}
       <CompleteTheSet slug={slug} />
+      <Reels slug={slug} />
       <StoreFooter />
     </div>
   );

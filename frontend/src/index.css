@@ -92,6 +92,25 @@ body {
 .product-tile img { transition: transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1); }
 .product-tile:hover img { transform: scale(1.04); }
 
+/* --- Reels (cinemagraph) --- */
+.reel-kb {
+  transform-origin: 50% 50%;
+  animation: reelKB 14s ease-in-out infinite alternate;
+  will-change: transform;
+}
+.reel-kb.reel-paused { animation-play-state: paused; }
+.reel-kb.reel-static { animation: none; transform: none; }
+
+@keyframes reelKB {
+  0%   { transform: scale(1.02) translate3d(0, 0, 0); }
+  50%  { transform: scale(1.10) translate3d(-1%, -1%, 0); }
+  100% { transform: scale(1.05) translate3d(1%, 1%, 0); }
+}
+
+/* Hide native scrollbar on the horizontal reel rail */
+[data-testid="reels-rail"] { scrollbar-width: none; }
+[data-testid="reels-rail"]::-webkit-scrollbar { display: none; }
+
 /* Scroll bar (admin) */
 .admin-scope ::-webkit-scrollbar { width: 8px; height: 8px; }
 .admin-scope ::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 4px; }

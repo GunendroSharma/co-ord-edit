@@ -242,6 +242,52 @@ async def get_bundle(slug: str):
     }
 
 
+# ================================ REELS ================================
+# Short styling videos for the PDP. Uses product imagery + optional video_url.
+# When video_url is empty, the frontend renders a CSS Ken-Burns "cinemagraph"
+# (near-zero payload, no lag). When set, frontend uses IntersectionObserver
+# to lazy-load the muted <video preload=none> only while it's on screen.
+_REELS_TITLES = [
+    "Styling the co-ord",
+    "The embroidery, up close",
+    "Kaftan on a Sunday",
+    "For festive evenings",
+    "How it drapes",
+    "A slow morning fit",
+]
+
+
+@api.get("/reels")
+async def reels(slug: Optional[str] = None):
+    """Return short styling reels. If ?slug=... pin the base product first."""
+    products = await db.products.find({"status": "active"}, _proj()).limit(12).to_list(12)
+    if not products:
+        return []
+    if slug:
+        products.sort(key=lambda p: 0 if p.get("slug") == slug else 1)
+    # Materialise up to 6 reels. Assign titles + first product image as poster.
+    items = []
+    for i, p in enumerate(products[:6]):
+        media = p.get("media") or []
+        poster = media[0].get("url") if media else ""
+        # Optional: if you ever store a real MP4 in media[k].url with kind="video", use it.
+        video = next((m.get("url") for m in media if m.get("kind") == "video"), "")
+        variant = (p.get("variants") or [{}])[0]
+        items.append({
+            "id": f"reel_{p['id'][:8]}",
+            "title": _REELS_TITLES[i % len(_REELS_TITLES)],
+            "poster_url": poster,
+            "video_url": video,
+            "product": {
+                "id": p["id"], "title": p["title"], "slug": p["slug"],
+                "price": variant.get("price", 0), "variant_id": variant.get("id"),
+                "variant_label": f"{variant.get('size','')}{(' / ' + variant.get('color','')) if variant.get('color') else ''}".strip(" /"),
+                "image": poster,
+            },
+        })
+    return items
+
+
 @api.get("/collections")
 async def list_collections():
     return _clean(await db.collections.find({}, _proj()).to_list(100))
