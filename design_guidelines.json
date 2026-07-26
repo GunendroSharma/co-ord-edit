@@ -1,0 +1,169 @@
+{
+  "theme": "light",
+  "typography": {
+    "font_families": {
+      "storefront_heading": "Cormorant Garamond, serif",
+      "storefront_body": "Outfit, sans-serif",
+      "admin_heading": "Manrope, sans-serif",
+      "admin_body": "IBM Plex Sans, sans-serif"
+    },
+    "hierarchy": {
+      "h1": "text-5xl sm:text-6xl tracking-tighter font-light",
+      "h2": "text-3xl sm:text-4xl tracking-tight font-light",
+      "h3": "text-xl sm:text-2xl tracking-tight",
+      "h4": "text-lg sm:text-xl",
+      "body": "text-base leading-relaxed",
+      "small": "text-sm tracking-wide",
+      "overline": "text-xs uppercase tracking-[0.2em]"
+    },
+    "rules": [
+      "Never use Inter, Roboto, or Open Sans for headings.",
+      "Storefront: Emphasize elegance and quiet luxury with Cormorant Garamond.",
+      "Admin: Clean, high-legibility with Manrope and IBM Plex Sans."
+    ]
+  },
+  "colors": {
+    "archetype": "Organic & Earthy (Storefront) + Soft Utility (Admin)",
+    "storefront_palette": {
+      "background": "#FAFAF9",
+      "surface": "#FFFFFF",
+      "primary": "#D4BBA5",
+      "primary_foreground": "#2C2A29",
+      "secondary": "#E8E2D9",
+      "accent": "#B5C1B4",
+      "text_primary": "#2C2A29",
+      "text_secondary": "#5C5A58",
+      "border": "#E8E2D9"
+    },
+    "admin_palette": {
+      "background": "#F4F4F5",
+      "surface": "#FFFFFF",
+      "primary": "#27272A",
+      "primary_foreground": "#FFFFFF",
+      "accent": "#E4D4C8",
+      "text_primary": "#18181B",
+      "text_secondary": "#71717A",
+      "border": "#E4E4E7"
+    },
+    "rules": [
+      "Storefront: Pastel minimal. Never use highly saturated colors. Use stone, sand, sage, bone.",
+      "Admin: High contrast, neutral palette. Color is used strictly for state and hierarchy.",
+      "Never use pure black (#000000) or pure gray (#808080). Tint neutrals warmly.",
+      "Ensure APCA/WCAG contrast ratios are met."
+    ]
+  },
+  "spacing_and_layout": {
+    "storefront": {
+      "spacing": "Generous. Use p-8, p-12, p-16 for containers. Whitespace is a luxury indicator.",
+      "grid": "Bento/Tetris Grid. Asymmetric alignments. Avoid perfectly uniform grids.",
+      "hero": "Full-bleed imagery with minimal text. Let the apparel shine."
+    },
+    "admin": {
+      "spacing": "Dense but legible. p-4 to p-6.",
+      "grid": "Strict alignment. 12-column grid. Sidebar navigation.",
+      "surface": "Flat solid surfaces with subtle 1px border. No heavy drop shadows."
+    },
+    "rules": [
+      "Always mobile-first. App must be a fully responsive PWA.",
+      "Optical alignment over geometric alignment."
+    ]
+  },
+  "components": {
+    "storefront": {
+      "strategy": "Custom HTML/Tailwind for layouts, heavily customized Shadcn for forms/drawers.",
+      "buttons": "Pill-shaped or sharp minimal. Soft transitions.",
+      "cards": "Cardless look for products. Just image and minimalist text beneath.",
+      "pdp": "Immersive image/video gallery, clear variant selector (size/color), elegant reviews."
+    },
+    "admin": {
+      "strategy": "Extensive use of Shadcn components (Tables, Dialogs, Select, Dropdowns).",
+      "buttons": "Crisp, rectangular, slight radius (rounded-md).",
+      "cards": "Subtle border, no shadow unless hovered.",
+      "views": "Order timeline view, drag-drop media library, KPI cards."
+    }
+  },
+  "visual_enhancers": {
+    "storefront": "Subtle noise texture on backgrounds. Crystal Glassmorphism for sticky headers (bg-white/70 backdrop-blur-xl border-b border-white/40).",
+    "admin": "Technical minimal. Subtle inner shadows for active states.",
+    "motion": "Lenis for smooth scrolling on Storefront. Framer Motion for page transitions, slow pan on product images, and staggered fade-ins."
+  },
+  "accessibility": {
+    "contrast": "Minimum 4.5:1 for normal text. APCA preferred.",
+    "testing": "All interactive elements MUST have data-testid attributes (e.g., data-testid='pdp-add-to-cart-button').",
+    "motion": "Respect prefers-reduced-motion."
+  },
+  "roles_and_auth": [
+    "Ensure distinct user flows and UI capabilities for roles: Owner, Manager, Support, Fulfillment."
+  ],
+  "image_urls": {
+    "hero_storefront": [
+      {
+        "url": "https://images.pexels.com/photos/8053683/pexels-photo-8053683.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Two women stand barefoot showcasing colorful dresses in a minimalist fashion style. Perfect for the main hero banner.",
+        "category": "Storefront Hero"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1702468508445-7510f972c37e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzJ8MHwxfHNlYXJjaHwyfHx3b21lbiUyMHBhc3RlbCUyMGVtYnJvaWRlcmVkJTIwZmFzaGlvbiUyMGFwcGFyZWx8ZW58MHx8fHwxNzg1MDQ1MzAzfDA&ixlib=rb-4.1.0&q=85",
+        "description": "Two women in elegant embroidered/pastel apparel",
+        "category": "Storefront Collection Hero"
+      }
+    ],
+    "products": [
+      {
+        "url": "https://images.unsplash.com/photo-1625136217041-171e27168e97?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzJ8MHwxfHNlYXJjaHwxfHx3b21lbiUyMHBhc3RlbCUyMGVtYnJvaWRlcmVkJTIwZmFzaGlvbiUyMGFwcGFyZWx8ZW58MHx8fHwxNzg1MDQ1MzAzfDA&ixlib=rb-4.1.0&q=85",
+        "description": "Woman in floral/embroidered pastel dress.",
+        "category": "Product Image"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1579207238889-e1122bfc0c89?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzJ8MHwxfHNlYXJjaHwzfHx3b21lbiUyMHBhc3RlbCUyMGVtYnJvaWRlcmVkJTIwZmFzaGlvbiUyMGFwcGFyZWx8ZW58MHx8fHwxNzg1MDQ1MzAzfDA&ixlib=rb-4.1.0&q=85",
+        "description": "Woman wearing gray and brown floral cardigan/embroidered top",
+        "category": "Product Image"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1712852733605-4776c3e61d94?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzJ8MHwxfHNlYXJjaHw0fHx3b21lbiUyMHBhc3RlbCUyMGVtYnJvaWRlcmVkJTIwZmFzaGlvbiUyMGFwcGFyZWx8ZW58MHx8fHwxNzg1MDQ1MzAzfDA&ixlib=rb-4.1.0&q=85",
+        "description": "Embroidered motif close-up / hanging clothes",
+        "category": "Product Image"
+      }
+    ],
+    "textures": [
+      {
+        "url": "https://images.pexels.com/photos/7498815/pexels-photo-7498815.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Detailed close-up of fabric highlighting beautiful lace/embroidery.",
+        "category": "Fabric Texture"
+      },
+      {
+        "url": "https://images.pexels.com/photos/6276032/pexels-photo-6276032.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Close-up of beige woven/embroidered fabric.",
+        "category": "Fabric Texture"
+      }
+    ],
+    "admin_placeholders": [
+      {
+        "url": "https://images.pexels.com/photos/8484131/pexels-photo-8484131.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Black woman fashion designer in studio with clothing rack.",
+        "category": "Admin Dashboard Banner/Placeholder"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "You are building 'Loom & Pastel Co.', a mid-premium women's fusion wear D2C brand.",
+    "Split the frontend into two distinctive but cohesive areas: Storefront (Modern Minimal Luxury) and Admin Dashboard (Clean, Dense Utility).",
+    "Storefront must prioritize imagery over UI elements. Avoid heavy card borders; use whitespace to frame products.",
+    "Do not use generic font pairs like Inter or Roboto. Use Cormorant Garamond and Outfit for Storefront, Manrope and IBM Plex Sans for Admin.",
+    "For components: Utilize Shadcn UI heavily for Admin. For Storefront, use raw HTML/Tailwind for layout to ensure high-end asymmetrical design, while embedding customized Shadcn for forms/inputs.",
+    "Apply Framer Motion for subtle entry animations and micro-interactions.",
+    "Ensure all interactive elements have data-testid attributes.",
+    "Never use purely transparent backgrounds on sticky headers or overlays. Use backdrop-blur combined with semi-transparent colors.",
+    "CRITICAL: The codebase uses .js/.jsx, NOT .tsx. All your components and instructions must be React JS, not TypeScript.",
+    "PWA installable: Setup manifests, service workers for offline-capability and installability."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "Do not converge toward generic 'AI slop' aesthetics. Break away from centered, uniform layouts.",
+    "Avoid simplistic gradients. Use solid colors or very subtle noise textures.",
+    "NEVER use generic emoji characters for icons. Use Phosphor Icons (@phosphor-icons/react) for high-end feel.",
+    "Apply hover/active/focus states consistently across the app.",
+    "Do not globally apply 'transition: all' in CSS.",
+    "Utilize Sonner for all toast notifications.",
+    "Never use placeholder image URLs like via.placeholder.com. ONLY use the provided Unsplash/Pexels URLs in the design guidelines."
+  ]
+}
