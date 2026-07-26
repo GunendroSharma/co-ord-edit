@@ -45,6 +45,17 @@ def _proj(**extra):
     return d
 
 
+def _clean(doc):
+    """Defensively strip MongoDB _id from a doc, list of docs, or nested list."""
+    if doc is None:
+        return None
+    if isinstance(doc, list):
+        return [_clean(d) for d in doc]
+    if isinstance(doc, dict):
+        doc.pop("_id", None)
+    return doc
+
+
 # ================================ HEALTH ================================
 @api.get("/")
 async def root():
@@ -91,7 +102,7 @@ async def me(user=Depends(get_current_user)):
 async def update_me(body: dict, user=Depends(get_current_user)):
     allowed = {k: v for k, v in body.items() if k in {"name", "phone", "addresses", "wishlist"}}
     await db.users.update_one({"id": user["id"]}, {"$set": allowed})
-    return await db.users.find_one({"id": user["id"]}, _proj(password_hash=0))
+    return _clean(await db.users.find_one({"id": user["id"]}, _proj(password_hash=0)))
 
 
 # ================================ PRODUCTS (Storefront) ================================
@@ -126,7 +137,7 @@ async def list_products(
             return (min_price is None or lo >= min_price) and (max_price is None or lo <= max_price)
         items = [p for p in items if _p(p)]
     total = await db.products.count_documents(query)
-    return {"items": items, "total": total}
+    return {"items": _clean(items), "total": total}
 
 
 @api.get("/products/{slug}")
@@ -135,12 +146,12 @@ async def get_product(slug: str):
     if not p:
         raise HTTPException(404, "Product not found")
     related = await db.products.find({"category": p.get("category"), "id": {"$ne": p["id"]}, "status": "active"}, _proj()).limit(4).to_list(4)
-    return {"product": p, "related": related}
+    return {"product": _clean(p), "related": _clean(related)}
 
 
 @api.get("/collections")
 async def list_collections():
-    return await db.collections.find({}, _proj()).to_list(100)
+    return _clean(await db.collections.find({}, _proj()).to_list(100))
 
 
 @api.get("/collections/{slug}")
@@ -149,13 +160,13 @@ async def get_collection(slug: str):
     if not c:
         raise HTTPException(404, "Collection not found")
     products = await db.products.find({"collection_ids": c["id"], "status": "active"}, _proj()).to_list(100)
-    return {"collection": c, "products": products}
+    return {"collection": _clean(c), "products": _clean(products)}
 
 
 # ================================ REVIEWS ================================
 @api.get("/products/{product_id}/reviews")
 async def get_reviews(product_id: str):
-    return await db.reviews.find({"product_id": product_id}, _proj()).sort([("created_at", -1)]).to_list(200)
+    return _clean(await db.reviews.find({"product_id": product_id}, _proj()).sort([("created_at", -1)]).to_list(200))
 
 
 @api.post("/products/{product_id}/reviews")
@@ -340,12 +351,12 @@ async def track_order(order_number: str, email: Optional[str] = None):
     if o.get("awb_code"):
         tr = shiprocket.track(o["awb_code"])
         o["live_tracking"] = tr
-    return o
+    return _clean(o)
 
 
 @api.get("/orders/mine")
 async def my_orders(user=Depends(get_current_user)):
-    return await db.orders.find({"customer_id": user["id"]}, _proj()).sort([("created_at", -1)]).to_list(200)
+    return _clean(await db.orders.find({"customer_id": user["id"]}, _proj()).sort([("created_at", -1)]).to_list(200))
 
 
 # ================================ NEWSLETTER ================================
@@ -364,7 +375,7 @@ async def content_page(slug: str):
     p = await db.pages.find_one({"slug": slug}, _proj())
     if not p:
         raise HTTPException(404, "Not found")
-    return p
+    return _clean(p)
 
 
 # ================================ IMAGEKIT AUTH ================================
@@ -391,7 +402,7 @@ async def admin_products(q: Optional[str] = None, status_: Optional[str] = Query
         query["title"] = {"$regex": q, "$options": "i"}
     if status_:
         query["status"] = status_
-    return await db.products.find(query, _proj()).sort([("created_at", -1)]).to_list(500)
+    return _clean(await db.products.find(query, _proj()).sort([("created_at", -1)]).to_list(500))
 
 
 @api.post("/admin/products")
@@ -414,7 +425,7 @@ async def admin_update_product(pid: str, body: dict, user=Depends(require_admin_
         for v in body["variants"]:
             v.setdefault("id", str(uuid.uuid4()))
     await db.products.update_one({"id": pid}, {"$set": body})
-    return await db.products.find_one({"id": pid}, _proj())
+    return _clean(await db.products.find_one({"id": pid}, _proj()))
 
 
 @api.delete("/admin/products/{pid}")
@@ -432,20 +443,22 @@ async def admin_delete_product(pid: str, user=Depends(require_admin_write)):
 
 @api.get("/admin/collections")
 async def admin_collections(user=Depends(require_staff)):
-    return await db.collections.find({}, _proj()).to_list(200)
+    return _clean(await db.collections.find({}, _proj()).to_list(200))
 
 
 @api.post("/admin/collections")
 async def admin_create_collection(body: dict, user=Depends(require_admin_write)):
     c = Collection(**body)
-    await db.collections.insert_one(c.model_dump())
-    return c.model_dump()
+    d = c.model_dump()
+    await db.collections.insert_one(d)
+    d.pop("_id", None)
+    return d
 
 
 @api.patch("/admin/collections/{cid}")
 async def admin_update_collection(cid: str, body: dict, user=Depends(require_admin_write)):
     await db.collections.update_one({"id": cid}, {"$set": body})
-    return await db.collections.find_one({"id": cid}, _proj())
+    return _clean(await db.collections.find_one({"id": cid}, _proj()))
 
 
 @api.delete("/admin/collections/{cid}")
@@ -469,7 +482,7 @@ async def admin_orders(
         query["payment_status"] = payment_status
     if q:
         query["$or"] = [{"order_number": {"$regex": q, "$options": "i"}}, {"customer_email": {"$regex": q, "$options": "i"}}]
-    return await db.orders.find(query, _proj()).sort([("created_at", -1)]).to_list(500)
+    return _clean(await db.orders.find(query, _proj()).sort([("created_at", -1)]).to_list(500))
 
 
 @api.get("/admin/orders/{oid}")
@@ -477,7 +490,7 @@ async def admin_order(oid: str, user=Depends(require_staff)):
     o = await db.orders.find_one({"$or": [{"id": oid}, {"order_number": oid}]}, _proj())
     if not o:
         raise HTTPException(404, "Not found")
-    return o
+    return _clean(o)
 
 
 @api.patch("/admin/orders/{oid}")
@@ -489,7 +502,7 @@ async def admin_update_order(oid: str, body: dict, user=Depends(require_staff)):
         {"$or": [{"id": oid}, {"order_number": oid}]},
         {"$set": updates, "$push": {"timeline": {"at": _now(), "event": event, "note": body.get("note", "")}}},
     )
-    return await db.orders.find_one({"$or": [{"id": oid}, {"order_number": oid}]}, _proj())
+    return _clean(await db.orders.find_one({"$or": [{"id": oid}, {"order_number": oid}]}, _proj()))
 
 
 @api.post("/admin/orders/{oid}/refund")
@@ -523,28 +536,30 @@ async def admin_customers(q: Optional[str] = None, user=Depends(require_staff)):
         ]).to_list(1)
         u["orders_count"] = stats[0]["count"] if stats else 0
         u["total_spent"] = round(stats[0]["spent"], 2) if stats else 0
-    return users
+    return _clean(users)
 
 
 @api.patch("/admin/customers/{uid}")
 async def admin_update_customer(uid: str, body: dict, user=Depends(require_staff)):
     allowed = {k: v for k, v in body.items() if k in {"name", "phone", "tags", "role"}}
     await db.users.update_one({"id": uid}, {"$set": allowed})
-    return await db.users.find_one({"id": uid}, _proj(password_hash=0))
+    return _clean(await db.users.find_one({"id": uid}, _proj(password_hash=0)))
 
 
 # ================================ ADMIN: COUPONS ================================
 @api.get("/admin/coupons")
 async def admin_coupons(user=Depends(require_staff)):
-    return await db.coupons.find({}, _proj()).to_list(500)
+    return _clean(await db.coupons.find({}, _proj()).to_list(500))
 
 
 @api.post("/admin/coupons")
 async def admin_create_coupon(body: dict, user=Depends(require_admin_write)):
     body["code"] = body.get("code", "").upper()
     c = Coupon(**body)
-    await db.coupons.insert_one(c.model_dump())
-    return c.model_dump()
+    d = c.model_dump()
+    await db.coupons.insert_one(d)
+    d.pop("_id", None)
+    return d
 
 
 @api.patch("/admin/coupons/{cid}")
@@ -552,7 +567,7 @@ async def admin_update_coupon(cid: str, body: dict, user=Depends(require_admin_w
     if "code" in body:
         body["code"] = body["code"].upper()
     await db.coupons.update_one({"id": cid}, {"$set": body})
-    return await db.coupons.find_one({"id": cid}, _proj())
+    return _clean(await db.coupons.find_one({"id": cid}, _proj()))
 
 
 @api.delete("/admin/coupons/{cid}")
@@ -564,14 +579,14 @@ async def admin_delete_coupon(cid: str, user=Depends(require_admin_write)):
 # ================================ ADMIN: EMAIL TEMPLATES ================================
 @api.get("/admin/email-templates")
 async def admin_email_templates(user=Depends(require_staff)):
-    return await db.email_templates.find({}, _proj()).to_list(200)
+    return _clean(await db.email_templates.find({}, _proj()).to_list(200))
 
 
 @api.patch("/admin/email-templates/{key}")
 async def admin_update_email_template(key: str, body: dict, user=Depends(require_admin_write)):
     body["updated_at"] = _now()
     await db.email_templates.update_one({"key": key}, {"$set": body}, upsert=True)
-    return await db.email_templates.find_one({"key": key}, _proj())
+    return _clean(await db.email_templates.find_one({"key": key}, _proj()))
 
 
 @api.post("/admin/email-templates/{key}/test")
@@ -592,40 +607,42 @@ async def admin_settings(user=Depends(require_staff)):
     if not s:
         s = StoreSettings().model_dump()
         await db.settings.insert_one(s)
-    return s
+    return _clean(s)
 
 
 @api.patch("/admin/settings")
 async def admin_update_settings(body: dict, user=Depends(require_admin_write)):
     body["updated_at"] = _now()
     await db.settings.update_one({"id": "singleton"}, {"$set": body}, upsert=True)
-    return await db.settings.find_one({"id": "singleton"}, _proj())
+    return _clean(await db.settings.find_one({"id": "singleton"}, _proj()))
 
 
 # ================================ ADMIN: PAGES (CMS) ================================
 @api.get("/admin/pages")
 async def admin_pages(user=Depends(require_staff)):
-    return await db.pages.find({}, _proj()).to_list(100)
+    return _clean(await db.pages.find({}, _proj()).to_list(100))
 
 
 @api.post("/admin/pages")
 async def admin_create_page(body: dict, user=Depends(require_admin_write)):
     p = ContentPage(**body)
-    await db.pages.insert_one(p.model_dump())
-    return p.model_dump()
+    d = p.model_dump()
+    await db.pages.insert_one(d)
+    d.pop("_id", None)
+    return d
 
 
 @api.patch("/admin/pages/{slug}")
 async def admin_update_page(slug: str, body: dict, user=Depends(require_admin_write)):
     body["updated_at"] = _now()
     await db.pages.update_one({"slug": slug}, {"$set": body})
-    return await db.pages.find_one({"slug": slug}, _proj())
+    return _clean(await db.pages.find_one({"slug": slug}, _proj()))
 
 
 # ================================ ADMIN: STAFF ================================
 @api.get("/admin/staff")
 async def admin_staff(user=Depends(require_staff)):
-    return await db.users.find({"role": {"$in": ["Owner", "Manager", "Support", "Fulfillment"]}}, _proj(password_hash=0)).to_list(100)
+    return _clean(await db.users.find({"role": {"$in": ["Owner", "Manager", "Support", "Fulfillment"]}}, _proj(password_hash=0)).to_list(100))
 
 
 @api.post("/admin/staff/invite")
