@@ -21,6 +21,8 @@ export default function Checkout() {
   }, [address.email]);
   const [couponCode, setCouponCode] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("razorpay");
+  const [giftWrap, setGiftWrap] = useState(false);
+  const [giftNote, setGiftNote] = useState("");
   const [quote, setQuote] = useState(null);
   const [placing, setPlacing] = useState(false);
 
@@ -30,11 +32,13 @@ export default function Checkout() {
       items: items.map((i) => ({ product_id: i.product_id, variant_id: i.variant_id, quantity: i.quantity })),
       pincode: address.pincode,
       coupon_code: couponCode || undefined,
+      gift_wrap: giftWrap,
+      gift_note: giftNote,
     });
     setQuote(data);
   };
 
-  useEffect(() => { refreshQuote(); /* eslint-disable-next-line */ }, [items, address.pincode, couponCode]);
+  useEffect(() => { refreshQuote(); /* eslint-disable-next-line */ }, [items, address.pincode, couponCode, giftWrap, giftNote]);
 
   const place = async () => {
     if (!address.name || !address.line1 || !address.city || !address.state || !address.pincode || !address.phone) {
@@ -45,6 +49,7 @@ export default function Checkout() {
       const { data } = await api.post("/checkout/place", {
         items: items.map((i) => ({ product_id: i.product_id, variant_id: i.variant_id, quantity: i.quantity })),
         shipping_address: address, email: address.email, payment_method: paymentMethod, coupon_code: couponCode || undefined,
+        gift_wrap: giftWrap, gift_note: giftNote,
       });
       const order = data.order;
       // Mock payment verification when online
@@ -115,12 +120,39 @@ export default function Checkout() {
             <input placeholder="Coupon code" value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())} className="flex-1 border border-[color:var(--sf-border)] px-3 py-2 text-sm bg-white" data-testid="checkout-coupon-input" />
             <button onClick={refreshQuote} className="btn-pill bg-white border px-4 text-sm" data-testid="checkout-apply-coupon">Apply</button>
           </div>
+
+          {/* Gift wrap */}
+          <div className="mt-6 border border-[color:var(--sf-border)] bg-white p-4" data-testid="gift-wrap-block">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" checked={giftWrap} onChange={(e) => setGiftWrap(e.target.checked)} className="mt-1 accent-[color:var(--sf-text)]" data-testid="gift-wrap-toggle" />
+              <div className="flex-1">
+                <div className="flex justify-between items-center">
+                  <div className="text-sm font-medium">Add gift wrapping</div>
+                  <div className="text-sm">+ ₹99</div>
+                </div>
+                <p className="text-xs text-[color:var(--sf-text-soft)] mt-1">Hand-tied with our signature ivory ribbon and a linen-blend gift note. No prices shown on the packing slip.</p>
+              </div>
+            </label>
+            {giftWrap && (
+              <textarea
+                placeholder="Add a personal note (up to 280 characters)"
+                value={giftNote}
+                onChange={(e) => setGiftNote(e.target.value.slice(0, 280))}
+                maxLength={280}
+                className="mt-3 w-full border border-[color:var(--sf-border)] px-3 py-2 text-sm h-20 resize-none"
+                data-testid="gift-note-input"
+              />
+            )}
+            {giftWrap && <div className="text-xs text-[color:var(--sf-text-soft)] mt-1 text-right" data-testid="gift-note-count">{giftNote.length}/280</div>}
+          </div>
+
           {quote && (
             <div className="mt-6 text-sm space-y-2 border-t pt-4">
               <Row label="Subtotal" value={`₹${quote.subtotal.toLocaleString("en-IN")}`} testid="q-subtotal" />
               {quote.discount > 0 && <Row label={`Discount${quote.coupon ? " (" + quote.coupon.code + ")" : ""}`} value={`− ₹${quote.discount.toLocaleString("en-IN")}`} testid="q-discount" />}
               <Row label={`Shipping${quote.courier ? " · " + quote.courier.courier : ""}`} value={quote.shipping === 0 ? "Free" : `₹${quote.shipping}`} testid="q-shipping" />
               <Row label="GST" value={`₹${quote.tax}`} testid="q-tax" />
+              {quote.gift_wrap && <Row label="Gift wrapping" value={`₹${quote.gift_wrap_fee}`} testid="q-gift" />}
               <div className="flex justify-between font-medium pt-2 border-t"><span>Total</span><span data-testid="q-total">₹{quote.total.toLocaleString("en-IN")}</span></div>
             </div>
           )}

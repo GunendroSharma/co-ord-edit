@@ -61,8 +61,15 @@ export function OrderDetail() {
               {o.discount > 0 && <div className="flex justify-between"><span>Discount</span><span>− ₹{o.discount}</span></div>}
               <div className="flex justify-between"><span>Shipping</span><span>₹{o.shipping}</span></div>
               <div className="flex justify-between"><span>Tax</span><span>₹{o.tax}</span></div>
+              {o.gift_wrap && <div className="flex justify-between"><span>Gift wrapping</span><span>₹{o.gift_wrap_fee}</span></div>}
               <div className="flex justify-between font-medium border-t pt-1"><span>Total</span><span>₹{o.total}</span></div>
             </div>
+            {o.gift_wrap && (
+              <div className="mt-4 p-3 bg-[#F5EFE6] border border-[#E4D4C8] rounded" data-testid="admin-gift-block">
+                <div className="text-xs uppercase tracking-wider text-zinc-600 mb-1">🎁 Gift order · include note card</div>
+                {o.gift_note ? <div className="text-sm italic text-zinc-800">"{o.gift_note}"</div> : <div className="text-sm text-zinc-500">No personal note.</div>}
+              </div>
+            )}
           </div>
           <div className="bg-white border rounded-md p-5"><b className="text-sm">Timeline</b>
             <ol className="mt-3 text-sm space-y-2">{o.timeline?.map((t, i) => (

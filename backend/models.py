@@ -131,6 +131,9 @@ class Order(Base):
     discount: float = 0
     shipping: float = 0
     tax: float = 0
+    gift_wrap: bool = False
+    gift_wrap_fee: float = 0
+    gift_note: str = ""
     total: float = 0
     coupon_code: Optional[str] = None
     payment_method: str = "cod"  # cod | razorpay | payu

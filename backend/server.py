@@ -304,13 +304,18 @@ async def checkout_quote(body: dict):
         shipping = 0
 
     tax = round(max(0, (subtotal - discount)) * (gst_rate / 100.0), 2)
-    total = round(max(0, subtotal - discount) + shipping + tax, 2)
+    gift_wrap = bool(body.get("gift_wrap"))
+    gift_wrap_fee = 99.0 if gift_wrap else 0.0
+    total = round(max(0, subtotal - discount) + shipping + tax + gift_wrap_fee, 2)
     return {
         "items": detailed_items,
         "subtotal": round(subtotal, 2),
         "discount": round(discount, 2),
         "shipping": round(shipping, 2),
         "tax": tax,
+        "gift_wrap": gift_wrap,
+        "gift_wrap_fee": gift_wrap_fee,
+        "gift_note": (body.get("gift_note") or "")[:280],
         "total": total,
         "courier": courier_info,
         "coupon": {"code": coupon_valid["code"], "kind": coupon_valid["kind"], "value": coupon_valid["value"]} if coupon_valid else None,
@@ -332,12 +337,15 @@ async def place_order(body: dict, user=Depends(optional_user)):
         discount=quote["discount"],
         shipping=quote["shipping"],
         tax=quote["tax"],
+        gift_wrap=quote.get("gift_wrap", False),
+        gift_wrap_fee=quote.get("gift_wrap_fee", 0),
+        gift_note=quote.get("gift_note", ""),
         total=quote["total"],
         coupon_code=(quote["coupon"]["code"] if quote.get("coupon") else None),
         payment_method=payment_method,
         payment_status="pending" if payment_method != "cod" else "cod_pending",
         shipping_address=address,
-        timeline=[{"at": _now(), "event": "order_created", "note": "Order placed"}],
+        timeline=[{"at": _now(), "event": "order_created", "note": "Order placed" + (" · gift-wrapped" if quote.get("gift_wrap") else "")}],
     )
 
     # Payment: create gateway order if online
