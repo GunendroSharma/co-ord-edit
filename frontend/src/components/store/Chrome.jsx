@@ -15,6 +15,7 @@ export function StoreHeader() {
     { to: "/collections/everyday-edit", label: "Everyday" },
     { to: "/collections/festive-reverie", label: "Festive" },
     { to: "/pages/about", label: "About" },
+    { to: "/gallery", label: "Community" },
   ];
 
   return (

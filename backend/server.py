@@ -17,7 +17,7 @@ from db import db, ensure_indexes
 from models import (
     User, SignupIn, LoginIn, Product, Collection, Variant, MediaAsset,
     Order, OrderItem, ShippingAddress, Coupon, Review, EmailTemplate,
-    StoreSettings, ContentPage, Newsletter, AbandonedCart,
+    StoreSettings, ContentPage, Newsletter, AbandonedCart, UGCPost,
 )
 from auth import (
     hash_pw, verify_pw, make_tokens, decode_token,
@@ -74,10 +74,65 @@ async def signup(payload: SignupIn):
     existing = await db.users.find_one({"email": payload.email.lower()})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
-    u = User(email=payload.email.lower(), password_hash=hash_pw(payload.password), name=payload.name)
+    # Referral handling
+    referred_by_code = (payload.referred_by or "").upper().strip() or None
+    referrer = None
+    if referred_by_code:
+        referrer = await db.users.find_one({"referral_code": referred_by_code})
+    u = User(
+        email=payload.email.lower(),
+        password_hash=hash_pw(payload.password),
+        name=payload.name,
+        referral_code=_gen_ref_code(payload.email),
+        referred_by=referred_by_code if referrer else None,
+    )
     await db.users.insert_one(u.model_dump())
+    # Grant ₹300 first-order coupon to the referred user
+    if referrer:
+        welcome_code = f"REF-{u.referral_code}"
+        await db.coupons.update_one(
+            {"code": welcome_code},
+            {"$setOnInsert": {
+                "id": str(uuid.uuid4()), "code": welcome_code, "kind": "flat", "value": 300,
+                "min_cart": 999, "max_uses": 1, "used": 0, "expires_at": None, "active": True,
+            }},
+            upsert=True,
+        )
     tokens = make_tokens(u.id, u.role)
-    return {**tokens, "user": {"id": u.id, "email": u.email, "name": u.name, "role": u.role}}
+    return {**tokens, "user": {"id": u.id, "email": u.email, "name": u.name, "role": u.role, "referral_code": u.referral_code, "welcome_coupon": (f"REF-{u.referral_code}" if referrer else None)}}
+
+
+def _gen_ref_code(email: str) -> str:
+    seed = email.split("@")[0].upper()[:4] + uuid.uuid4().hex[:4].upper()
+    return seed
+
+
+@api.get("/referrals/me")
+async def referrals_me(user=Depends(get_current_user)):
+    # Backfill code if legacy account
+    if not user.get("referral_code"):
+        code = _gen_ref_code(user["email"])
+        await db.users.update_one({"id": user["id"]}, {"$set": {"referral_code": code}})
+        user["referral_code"] = code
+    invites = await db.users.count_documents({"referred_by": user["referral_code"]})
+    return {
+        "code": user["referral_code"],
+        "share_url": f"?ref={user['referral_code']}",
+        "invites": invites,
+        "credits_earned": float(user.get("credits_earned") or 0),
+        "message": "Give ₹300, get ₹300. Your friend gets ₹300 off their first order, and you get a ₹300 credit when they check out.",
+    }
+
+
+@api.post("/referrals/validate")
+async def referrals_validate(body: dict):
+    code = (body.get("code") or "").upper().strip()
+    if not code:
+        return {"valid": False}
+    ref = await db.users.find_one({"referral_code": code}, {"_id": 0, "name": 1, "email": 1})
+    if not ref:
+        return {"valid": False}
+    return {"valid": True, "referrer_name": ref.get("name") or ref["email"].split("@")[0]}
 
 
 @api.post("/auth/login")
@@ -341,6 +396,36 @@ async def verify_payment(body: dict):
         {"$set": {"payment_status": "paid", "status": "confirmed", "updated_at": _now()},
          "$push": {"timeline": {"at": _now(), "event": "payment_captured", "note": payment_id}}},
     )
+    # ---- Referral credit issuance ----
+    order = await db.orders.find_one({"payment_reference": order_ref}, _proj())
+    if order and order.get("customer_id"):
+        buyer = await db.users.find_one({"id": order["customer_id"]}, {"_id": 0})
+        ref_code = buyer.get("referred_by") if buyer else None
+        prior_paid = await db.orders.count_documents({"customer_id": order["customer_id"], "payment_status": "paid"})
+        if ref_code and prior_paid <= 1:
+            referrer = await db.users.find_one({"referral_code": ref_code}, {"_id": 0})
+            if referrer:
+                # Grant referrer a ₹300 credit coupon
+                cred_code = f"THANKS-{ref_code}-{uuid.uuid4().hex[:4].upper()}"
+                await db.coupons.update_one(
+                    {"code": cred_code},
+                    {"$setOnInsert": {"id": str(uuid.uuid4()), "code": cred_code, "kind": "flat", "value": 300,
+                                       "min_cart": 999, "max_uses": 1, "used": 0, "expires_at": None, "active": True}},
+                    upsert=True,
+                )
+                await db.users.update_one(
+                    {"id": referrer["id"]},
+                    {"$inc": {"credits_earned": 300, "invites": 1}},
+                )
+                # Fire a courtesy email to the referrer
+                try:
+                    get_email_provider().send(
+                        referrer["email"],
+                        "You earned a ₹300 credit!",
+                        f"<p>Hi {referrer.get('name') or 'there'}, a friend you invited just placed their first order. Your ₹300 credit is ready — use code <b>{cred_code}</b> at your next checkout.</p>",
+                    )
+                except Exception:
+                    pass
     return {"ok": True}
 
 
@@ -849,9 +934,31 @@ async def _send_abandoned_reminder(cart: dict):
         if not tmpl:
             return
         item_lines = "".join([f"<li>{i.get('title')} × {i.get('quantity')}</li>" for i in cart.get("items", [])])
+        # ---- Auto-attach first-time coupon ----
+        email = cart.get("email", "")
+        has_ordered = await db.orders.count_documents({"customer_email": email}) if email else 0
+        coupon_code = None
+        if not has_ordered:
+            # Reuse HELLO10 as the first-time welcome, or generate a unique single-use one for higher intent
+            coupon_code = f"COMEBACK-{uuid.uuid4().hex[:5].upper()}"
+            await db.coupons.update_one(
+                {"code": coupon_code},
+                {"$setOnInsert": {
+                    "id": str(uuid.uuid4()), "code": coupon_code, "kind": "percent", "value": 10,
+                    "min_cart": 0, "max_uses": 1, "used": 0, "expires_at": None, "active": True,
+                }},
+                upsert=True,
+            )
+        coupon_html = ""
+        if coupon_code:
+            coupon_html = f'<p style="margin-top:16px;padding:12px 16px;background:#F5EFE6;border:1px solid #D4BBA5;font-size:14px;">Here\'s <b>10% off</b> to help you decide — use code <b style="font-size:16px;letter-spacing:0.05em;">{coupon_code}</b> at checkout. One-time use, expires soon.</p>'
         html = tmpl["body_html"].replace("{customerName}", cart.get("email", "there").split("@")[0]).replace("{items}", f"<ul>{item_lines}</ul>")
+        html += coupon_html
         get_email_provider().send(cart["email"], tmpl["subject"], html)
-        await db.abandoned_carts.update_one({"id": cart["id"]}, {"$set": {"reminded_at": _now()}})
+        await db.abandoned_carts.update_one(
+            {"id": cart["id"]},
+            {"$set": {"reminded_at": _now(), "coupon_code": coupon_code}},
+        )
     except Exception as e:
         log.warning(f"abandoned cart reminder failed: {e}")
 
@@ -898,6 +1005,46 @@ async def instagram_feed():
         except Exception as e:
             log.warning(f"instagram fetch failed: {e}")
     return INSTAGRAM_MOCK
+
+
+# ================================ UGC GALLERY ================================
+@api.get("/ugc")
+async def ugc_public():
+    posts = await db.ugc.find({"approved": True}, _proj()).sort([("created_at", -1)]).to_list(60)
+    # Hydrate product refs
+    for p in posts:
+        if p.get("product_ids"):
+            prods = await db.products.find({"id": {"$in": p["product_ids"]}, "status": "active"}, {"_id": 0, "title": 1, "slug": 1, "media": 1, "variants": 1}).to_list(20)
+            p["tagged_products"] = [{"title": pr["title"], "slug": pr["slug"], "image": pr.get("media", [{}])[0].get("url", ""), "price": (pr.get("variants") or [{}])[0].get("price", 0)} for pr in prods]
+        else:
+            p["tagged_products"] = []
+    return _clean(posts)
+
+
+@api.get("/admin/ugc")
+async def admin_ugc(user=Depends(require_staff)):
+    return _clean(await db.ugc.find({}, _proj()).sort([("created_at", -1)]).to_list(500))
+
+
+@api.post("/admin/ugc")
+async def admin_ugc_create(body: dict, user=Depends(require_admin_write)):
+    p = UGCPost(**body)
+    d = p.model_dump()
+    await db.ugc.insert_one(d)
+    d.pop("_id", None)
+    return d
+
+
+@api.patch("/admin/ugc/{uid}")
+async def admin_ugc_update(uid: str, body: dict, user=Depends(require_admin_write)):
+    await db.ugc.update_one({"id": uid}, {"$set": body})
+    return _clean(await db.ugc.find_one({"id": uid}, _proj()))
+
+
+@api.delete("/admin/ugc/{uid}")
+async def admin_ugc_delete(uid: str, user=Depends(require_admin_write)):
+    await db.ugc.delete_one({"id": uid})
+    return {"ok": True}
 
 
 # ================================ SEO: sitemap + prerender ================================

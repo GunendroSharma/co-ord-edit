@@ -20,6 +20,8 @@ import { AdminLogin, Dashboard, Products, ProductEdit } from "@/pages/admin/Admi
 import { Orders, OrderDetail, Customers, Discounts } from "@/pages/admin/AdminOrders";
 import { Media, Emails, Pages, Analytics, Settings, Collections } from "@/pages/admin/AdminMore";
 import { AbandonedCarts } from "@/pages/admin/AbandonedCarts";
+import { UGCAdmin } from "@/pages/admin/UGCAdmin";
+import Gallery from "@/pages/store/Gallery";
 
 function App() {
   useEffect(() => {
@@ -50,6 +52,7 @@ function App() {
             <Route path="/account" element={<Account />} />
             <Route path="/wishlist" element={<Shop />} />
             <Route path="/pages/:slug" element={<ContentPage />} />
+            <Route path="/gallery" element={<Gallery />} />
 
             {/* Admin */}
             <Route path="/admin/login" element={<AdminLogin />} />
@@ -68,6 +71,7 @@ function App() {
               <Route path="pages" element={<Pages />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="abandoned-carts" element={<AbandonedCarts />} />
+              <Route path="ugc" element={<UGCAdmin />} />
               <Route path="settings" element={<Settings />} />
             </Route>
 

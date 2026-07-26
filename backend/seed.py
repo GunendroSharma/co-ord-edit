@@ -142,6 +142,20 @@ async def run():
         if not await db.coupons.find_one({"code": c["code"]}):
             await db.coupons.insert_one(Coupon(**c).model_dump())
 
+    # UGC seed
+    ugc_seed = [
+        {"image_url": "https://images.unsplash.com/photo-1702468508445-7510f972c37e?w=1000&q=85", "caption": "In love with my Ivory Anarkali 💛", "author_handle": "@aanya.wears", "source": "instagram"},
+        {"image_url": "https://images.unsplash.com/photo-1625136217041-171e27168e97?w=1000&q=85", "caption": "Marigold co-ord for the mehendi", "author_handle": "@shreya.saha", "source": "instagram"},
+        {"image_url": "https://images.unsplash.com/photo-1579207238889-e1122bfc0c89?w=1000&q=85", "caption": "Chikankari season", "author_handle": "@priya.reads", "source": "instagram"},
+        {"image_url": "https://images.pexels.com/photos/8053683/pexels-photo-8053683.jpeg?w=1000", "caption": "Slow Sundays in Rosewater", "author_handle": "@meera.mornings", "source": "instagram"},
+    ]
+    from models import UGCPost as _UGC
+    if await db.ugc.count_documents({}) == 0:
+        products = await db.products.find({}, {"id": 1, "slug": 1, "_id": 0}).to_list(20)
+        for i, u in enumerate(ugc_seed):
+            tagged = [products[i % len(products)]["id"]] if products else []
+            await db.ugc.insert_one(_UGC(**u, product_ids=tagged).model_dump())
+
     # Settings
     if not await db.settings.find_one({"id": "singleton"}):
         await db.settings.insert_one(StoreSettings().model_dump())

@@ -8,6 +8,7 @@ import { StoreHeader, StoreFooter } from "@/components/store/Chrome";
 import { Heart, Star } from "lucide-react";
 import { toast } from "sonner";
 import { ProductTile } from "./Home";
+import { SizeChartTrigger } from "@/components/store/SizeChart";
 
 export default function ProductDetail() {
   const { slug } = useParams();
@@ -103,6 +104,7 @@ export default function ProductDetail() {
                 );
               })}
             </div>
+            <SizeChartTrigger category={p.category} />
           </div>
 
           {uniqueColors.length > 1 && (

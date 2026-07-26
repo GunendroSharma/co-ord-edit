@@ -27,6 +27,10 @@ class User(Base):
     tags: List[str] = []
     addresses: List[Dict[str, Any]] = []
     wishlist: List[str] = []  # product ids
+    referral_code: str = ""
+    referred_by: Optional[str] = None
+    credits_earned: float = 0.0
+    invites: int = 0
     created_at: str = Field(default_factory=_now)
 
 
@@ -34,6 +38,7 @@ class SignupIn(Base):
     email: EmailStr
     password: str
     name: str = ""
+    referred_by: Optional[str] = None
 
 
 class LoginIn(Base):
@@ -215,3 +220,14 @@ class AbandonedCart(Base):
     updated_at: str = Field(default_factory=_now)
     reminded_at: Optional[str] = None
     recovered: bool = False
+
+
+class UGCPost(Base):
+    id: str = Field(default_factory=_uid)
+    image_url: str
+    caption: str = ""
+    author_handle: str = ""
+    source: str = "instagram"  # instagram | manual
+    product_ids: List[str] = []
+    approved: bool = True
+    created_at: str = Field(default_factory=_now)
