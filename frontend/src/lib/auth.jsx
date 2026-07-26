@@ -10,13 +10,14 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const token = localStorage.getItem("lp_access_token");
     if (!token) { setReady(true); return; }
-    api.get("/auth/me").then((r) => setUser(r.data)).catch(() => {}).finally(() => setReady(true));
+    api.get("/auth/me").then((r) => { setUser(r.data); if (r.data?.email) localStorage.setItem("lp_shopper_email", r.data.email); }).catch(() => {}).finally(() => setReady(true));
   }, []);
 
   const login = async (email, password) => {
     const { data } = await api.post("/auth/login", { email, password });
     localStorage.setItem("lp_access_token", data.access_token);
     localStorage.setItem("lp_refresh_token", data.refresh_token);
+    localStorage.setItem("lp_shopper_email", data.user.email);
     setUser(data.user);
     return data.user;
   };
@@ -24,6 +25,7 @@ export function AuthProvider({ children }) {
     const { data } = await api.post("/auth/signup", { email, password, name });
     localStorage.setItem("lp_access_token", data.access_token);
     localStorage.setItem("lp_refresh_token", data.refresh_token);
+    localStorage.setItem("lp_shopper_email", data.user.email);
     setUser(data.user);
     return data.user;
   };

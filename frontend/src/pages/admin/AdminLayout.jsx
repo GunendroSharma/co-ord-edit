@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { LayoutGrid, Package, ShoppingCart, Users, Tag, BarChart3, Mail, Settings as SettingsIcon, FileText, Image, LogOut, Menu, X } from "lucide-react";
+import { LayoutGrid, Package, ShoppingCart, Users, Tag, BarChart3, Mail, Settings as SettingsIcon, FileText, Image, LogOut, Menu, X, ShoppingBasket } from "lucide-react";
 
 const NAV = [
   { to: "/admin", label: "Dashboard", icon: LayoutGrid, end: true },
@@ -10,6 +10,7 @@ const NAV = [
   { to: "/admin/orders", label: "Orders", icon: ShoppingCart },
   { to: "/admin/customers", label: "Customers", icon: Users },
   { to: "/admin/discounts", label: "Discounts", icon: Tag },
+  { to: "/admin/abandoned-carts", label: "Abandoned", icon: ShoppingBasket },
   { to: "/admin/media", label: "Media", icon: Image },
   { to: "/admin/emails", label: "Emails", icon: Mail },
   { to: "/admin/pages", label: "Pages", icon: FileText },

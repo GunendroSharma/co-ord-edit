@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { api } from "./api";
 
 const CartCtx = createContext(null);
 const KEY = "lp_cart_v1";
@@ -11,6 +12,16 @@ export function CartProvider({ children }) {
 
   useEffect(() => { localStorage.setItem(KEY, JSON.stringify(items)); }, [items]);
   useEffect(() => { localStorage.setItem(WKEY, JSON.stringify(wishlist)); }, [wishlist]);
+
+  // Abandoned cart tracking — save snapshot whenever items change and we know the shopper's email
+  useEffect(() => {
+    const email = localStorage.getItem("lp_shopper_email");
+    if (!email) return;
+    const t = setTimeout(() => {
+      api.post("/cart/save", { email, items }).catch(() => {});
+    }, 800);
+    return () => clearTimeout(t);
+  }, [items]);
 
   const addItem = (product, variant, quantity = 1) => {
     setItems((cur) => {

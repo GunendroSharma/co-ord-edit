@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
 import { useCart } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
@@ -44,6 +45,22 @@ export default function ProductDetail() {
 
   return (
     <div>
+      <Helmet>
+        <title>{p.seo_title || `${p.title} — Loom & Pastel Co.`}</title>
+        <meta name="description" content={p.seo_description || p.description?.slice(0, 155)} />
+        <meta property="og:title" content={p.title} />
+        <meta property="og:image" content={p.media?.[0]?.url} />
+        <meta property="og:type" content="product" />
+        <meta property="product:price:amount" content={selVariant?.price} />
+        <meta property="product:price:currency" content="INR" />
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org", "@type": "Product",
+          name: p.title, description: p.description, image: (p.media || []).map(m => m.url),
+          brand: { "@type": "Brand", name: "Loom & Pastel Co." },
+          aggregateRating: p.rating_count > 0 ? { "@type": "AggregateRating", ratingValue: p.rating_avg, reviewCount: p.rating_count } : undefined,
+          offers: { "@type": "Offer", priceCurrency: "INR", price: selVariant?.price, availability: (selVariant?.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock") },
+        })}</script>
+      </Helmet>
       <StoreHeader />
       <section className="max-w-7xl mx-auto px-6 py-8 md:py-12 grid grid-cols-1 md:grid-cols-2 gap-10" data-testid="pdp-section">
         {/* Gallery */}

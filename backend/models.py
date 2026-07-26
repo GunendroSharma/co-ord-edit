@@ -204,3 +204,14 @@ class Newsletter(Base):
     id: str = Field(default_factory=_uid)
     email: EmailStr
     created_at: str = Field(default_factory=_now)
+
+
+class AbandonedCart(Base):
+    id: str = Field(default_factory=_uid)
+    email: str
+    customer_id: Optional[str] = None
+    items: List[Dict[str, Any]] = []
+    subtotal: float = 0
+    updated_at: str = Field(default_factory=_now)
+    reminded_at: Optional[str] = None
+    recovered: bool = False

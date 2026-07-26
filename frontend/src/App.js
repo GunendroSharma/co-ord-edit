@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import "@/index.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HelmetProvider } from "react-helmet-async";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/lib/auth";
 import { CartProvider } from "@/lib/cart";
@@ -18,6 +19,7 @@ import AdminLayout from "@/pages/admin/AdminLayout";
 import { AdminLogin, Dashboard, Products, ProductEdit } from "@/pages/admin/AdminCore";
 import { Orders, OrderDetail, Customers, Discounts } from "@/pages/admin/AdminOrders";
 import { Media, Emails, Pages, Analytics, Settings, Collections } from "@/pages/admin/AdminMore";
+import { AbandonedCarts } from "@/pages/admin/AbandonedCarts";
 
 function App() {
   useEffect(() => {
@@ -28,6 +30,7 @@ function App() {
     }
   }, []);
   return (
+    <HelmetProvider>
     <BrowserRouter>
       <AuthProvider>
         <CartProvider>
@@ -64,6 +67,7 @@ function App() {
               <Route path="emails" element={<Emails />} />
               <Route path="pages" element={<Pages />} />
               <Route path="analytics" element={<Analytics />} />
+              <Route path="abandoned-carts" element={<AbandonedCarts />} />
               <Route path="settings" element={<Settings />} />
             </Route>
 
@@ -72,6 +76,7 @@ function App() {
         </CartProvider>
       </AuthProvider>
     </BrowserRouter>
+    </HelmetProvider>
   );
 }
 export default App;

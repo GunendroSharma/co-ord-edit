@@ -69,12 +69,38 @@ function Card({ title, children }) {
 export function Products() {
   const [items, setItems] = useState([]);
   const [q, setQ] = useState("");
+  const [importing, setImporting] = useState(false);
   const load = () => api.get("/admin/products", { params: { q } }).then((r) => setItems(r.data));
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [q]);
   const del = async (id) => { if (window.confirm("Delete this product?")) { await api.delete(`/admin/products/${id}`); load(); toast.success("Deleted"); } };
+  const importCsv = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const { data } = await api.post("/admin/products/bulk-import", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      toast.success(`Imported: ${data.created} created · ${data.updated} updated${data.errors.length ? ` · ${data.errors.length} errors` : ""}`);
+      load();
+    } catch (er) { toast.error("Import failed"); }
+    finally { setImporting(false); e.target.value = ""; }
+  };
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
   return (
     <div data-testid="admin-products">
-      <div className="flex justify-between mb-6"><h1 className="text-2xl font-admin-head">Products</h1><Link to="/admin/products/new" className="bg-zinc-900 text-white text-sm px-4 py-2 rounded-md" data-testid="new-product-btn">New product</Link></div>
+      <div className="flex flex-wrap justify-between gap-3 mb-6">
+        <h1 className="text-2xl font-admin-head">Products</h1>
+        <div className="flex gap-2 flex-wrap">
+          <a href={`${BACKEND_URL}/api/admin/products/import-template.csv`} className="text-sm border rounded-md px-3 py-2 bg-white" data-testid="download-template-btn">Template</a>
+          <a href={`${BACKEND_URL}/api/admin/products/export.csv`} className="text-sm border rounded-md px-3 py-2 bg-white" data-testid="export-csv-btn">Export CSV</a>
+          <label className="text-sm border rounded-md px-3 py-2 bg-white cursor-pointer" data-testid="import-csv-label">
+            {importing ? "Importing…" : "Import CSV"}
+            <input type="file" accept=".csv" onChange={importCsv} className="hidden" data-testid="import-csv-input" />
+          </label>
+          <Link to="/admin/products/new" className="bg-zinc-900 text-white text-sm px-4 py-2 rounded-md" data-testid="new-product-btn">New product</Link>
+        </div>
+      </div>
       <input placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} className="border rounded-md px-3 py-2 text-sm mb-4 w-full max-w-sm" data-testid="products-search" />
       <div className="bg-white border rounded-md overflow-x-auto">
         <table className="w-full text-sm">

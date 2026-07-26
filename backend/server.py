@@ -1,17 +1,23 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query, Request, UploadFile, File
+from fastapi.responses import Response, PlainTextResponse
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from typing import Optional, List
 import logging
 import os
+import io
+import csv
 import uuid
-from datetime import datetime, timezone
+import asyncio
+import httpx
+from datetime import datetime, timezone, timedelta
 
 from config import settings
 from db import db, ensure_indexes
 from models import (
     User, SignupIn, LoginIn, Product, Collection, Variant, MediaAsset,
     Order, OrderItem, ShippingAddress, Coupon, Review, EmailTemplate,
-    StoreSettings, ContentPage, Newsletter,
+    StoreSettings, ContentPage, Newsletter, AbandonedCart,
 )
 from auth import (
     hash_pw, verify_pw, make_tokens, decode_token,
@@ -727,6 +733,226 @@ async def webhook_shiprocket(request: Request):
             {"$push": {"timeline": {"at": _now(), "event": "tracking_update", "note": status_}}},
         )
     return {"ok": True}
+
+
+# ================================ CSV IMPORT / EXPORT ================================
+@api.post("/admin/products/bulk-import")
+async def bulk_import_products(file: UploadFile = File(...), user=Depends(require_admin_write)):
+    content = (await file.read()).decode("utf-8-sig", errors="ignore")
+    reader = csv.DictReader(io.StringIO(content))
+    created, updated, errors = 0, 0, []
+    for row in reader:
+        try:
+            slug = (row.get("slug") or row.get("title", "")).strip().lower().replace(" ", "-")
+            if not slug:
+                continue
+            sizes = [s.strip() for s in (row.get("sizes") or "XS,S,M,L").split(",") if s.strip()]
+            price = float(row.get("price") or 0)
+            compare = float(row.get("compare_at_price") or 0) or None
+            stock_per = int(row.get("stock") or 10)
+            image_urls = [u.strip() for u in (row.get("image_urls") or "").split("|") if u.strip()]
+            sku_root = slug.upper()[:8]
+            variants = [{"id": str(uuid.uuid4()), "sku": f"{sku_root}-{s}", "size": s, "color": row.get("color") or "Natural",
+                         "price": price, "compare_at_price": compare, "stock": stock_per, "backorder": False, "image_ids": []} for s in sizes]
+            media = [{"file_id": f"csv_{uuid.uuid4().hex[:8]}", "url": u, "thumbnail_url": u, "kind": "image",
+                      "tag": "product", "is_primary": i == 0} for i, u in enumerate(image_urls)]
+            doc = {
+                "title": row.get("title", "").strip(), "slug": slug,
+                "description": row.get("description", ""), "category": row.get("category", ""),
+                "tags": [t.strip() for t in (row.get("tags") or "").split(",") if t.strip()],
+                "status": row.get("status") or "active",
+                "seo_title": row.get("seo_title", ""), "seo_description": row.get("seo_description", ""),
+                "variants": variants, "media": media, "updated_at": _now(),
+            }
+            existing = await db.products.find_one({"slug": slug})
+            if existing:
+                await db.products.update_one({"slug": slug}, {"$set": doc})
+                updated += 1
+            else:
+                p = Product(**doc)
+                d = p.model_dump()
+                await db.products.insert_one(d)
+                created += 1
+        except Exception as e:
+            errors.append({"row": row.get("slug") or row.get("title"), "error": str(e)})
+    return {"created": created, "updated": updated, "errors": errors}
+
+
+@api.get("/admin/products/export.csv")
+async def export_products(user=Depends(require_staff)):
+    rows = await db.products.find({}, _proj()).to_list(1000)
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(["slug", "title", "description", "category", "tags", "status", "sizes", "price", "compare_at_price", "stock", "image_urls", "seo_title", "seo_description"])
+    for p in rows:
+        variants = p.get("variants") or [{}]
+        first = variants[0] if variants else {}
+        sizes = ",".join([v.get("size", "") for v in variants])
+        images = "|".join([m.get("url", "") for m in (p.get("media") or [])])
+        writer.writerow([
+            p.get("slug", ""), p.get("title", ""), p.get("description", ""), p.get("category", ""),
+            ",".join(p.get("tags") or []), p.get("status", ""), sizes,
+            first.get("price", 0), first.get("compare_at_price") or "", first.get("stock", 0),
+            images, p.get("seo_title", ""), p.get("seo_description", ""),
+        ])
+    return Response(content=out.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=products.csv"})
+
+
+@api.get("/admin/products/import-template.csv")
+async def import_template(user=Depends(require_staff)):
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(["slug", "title", "description", "category", "tags", "status", "sizes", "price", "compare_at_price", "stock", "image_urls", "seo_title", "seo_description", "color"])
+    writer.writerow(["saffron-kaftan", "Saffron Kaftan", "Breezy linen kaftan.", "kaftans", "kaftan,linen", "active", "XS,S,M,L", "3490", "4200", "12", "https://images.unsplash.com/photo-1625136217041-171e27168e97", "Saffron Kaftan — Loom & Pastel Co.", "Breezy linen kaftan in saffron.", "Saffron"])
+    return Response(content=out.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=products-template.csv"})
+
+
+# ================================ ABANDONED CART ================================
+@api.post("/cart/save")
+async def cart_save(body: dict):
+    """Called by frontend when a user with an email has items in cart."""
+    email = (body.get("email") or "").lower().strip()
+    if not email or "@" not in email:
+        return {"ok": False}
+    items = body.get("items") or []
+    if not items:
+        # cart cleared → mark recovered
+        await db.abandoned_carts.update_many({"email": email, "recovered": False}, {"$set": {"recovered": True}})
+        return {"ok": True, "cleared": True}
+    subtotal = sum(float(i.get("price", 0)) * int(i.get("quantity", 1)) for i in items)
+    await db.abandoned_carts.update_one(
+        {"email": email, "recovered": False},
+        {"$set": {"items": items, "subtotal": round(subtotal, 2), "updated_at": _now(), "customer_id": body.get("customer_id")},
+         "$setOnInsert": {"id": str(uuid.uuid4()), "reminded_at": None, "recovered": False}},
+        upsert=True,
+    )
+    return {"ok": True}
+
+
+@api.get("/admin/abandoned-carts")
+async def admin_abandoned_carts(user=Depends(require_staff)):
+    return _clean(await db.abandoned_carts.find({"recovered": False}, _proj()).sort([("updated_at", -1)]).to_list(200))
+
+
+@api.post("/admin/abandoned-carts/{cid}/remind")
+async def admin_remind_cart(cid: str, user=Depends(require_staff)):
+    c = await db.abandoned_carts.find_one({"id": cid}, _proj())
+    if not c:
+        raise HTTPException(404, "Not found")
+    await _send_abandoned_reminder(c)
+    return {"ok": True}
+
+
+async def _send_abandoned_reminder(cart: dict):
+    try:
+        tmpl = await db.email_templates.find_one({"key": "abandoned_cart"}, _proj())
+        if not tmpl:
+            return
+        item_lines = "".join([f"<li>{i.get('title')} × {i.get('quantity')}</li>" for i in cart.get("items", [])])
+        html = tmpl["body_html"].replace("{customerName}", cart.get("email", "there").split("@")[0]).replace("{items}", f"<ul>{item_lines}</ul>")
+        get_email_provider().send(cart["email"], tmpl["subject"], html)
+        await db.abandoned_carts.update_one({"id": cart["id"]}, {"$set": {"reminded_at": _now()}})
+    except Exception as e:
+        log.warning(f"abandoned cart reminder failed: {e}")
+
+
+async def _abandoned_cart_loop():
+    """Every 15 min, find carts older than 2 hours without reminder and email them."""
+    while True:
+        try:
+            await asyncio.sleep(15 * 60)
+            threshold = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+            cursor = db.abandoned_carts.find({"recovered": False, "reminded_at": None, "updated_at": {"$lt": threshold}}, _proj())
+            async for c in cursor:
+                await _send_abandoned_reminder(c)
+        except Exception as e:
+            log.warning(f"abandoned loop error: {e}")
+
+
+# ================================ INSTAGRAM FEED ================================
+INSTAGRAM_MOCK = [
+    {"id": "ig1", "url": "https://images.unsplash.com/photo-1702468508445-7510f972c37e?w=800&q=85", "caption": "Softly stitched · SS26", "permalink": "https://instagram.com/loompastelco"},
+    {"id": "ig2", "url": "https://images.unsplash.com/photo-1625136217041-171e27168e97?w=800&q=85", "caption": "Marigold co-ord in the studio", "permalink": "https://instagram.com/loompastelco"},
+    {"id": "ig3", "url": "https://images.unsplash.com/photo-1579207238889-e1122bfc0c89?w=800&q=85", "caption": "Details, always", "permalink": "https://instagram.com/loompastelco"},
+    {"id": "ig4", "url": "https://images.unsplash.com/photo-1712852733605-4776c3e61d94?w=800&q=85", "caption": "Handloom mornings", "permalink": "https://instagram.com/loompastelco"},
+    {"id": "ig5", "url": "https://images.pexels.com/photos/8053683/pexels-photo-8053683.jpeg?w=800", "caption": "Slow-fashion Sunday", "permalink": "https://instagram.com/loompastelco"},
+    {"id": "ig6", "url": "https://images.pexels.com/photos/7498815/pexels-photo-7498815.jpeg?w=800", "caption": "Motifs by hand", "permalink": "https://instagram.com/loompastelco"},
+]
+
+
+@api.get("/instagram/feed")
+async def instagram_feed():
+    # Real integration would call Instagram Basic Display API:
+    #   https://graph.instagram.com/me/media?fields=id,caption,media_url,permalink&access_token={IG_ACCESS_TOKEN}
+    # For now return curated MOCK feed. Toggle by setting IG_ACCESS_TOKEN in env.
+    token = os.environ.get("IG_ACCESS_TOKEN")
+    if token and not settings.MOCK_MODE:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                r = await client.get(
+                    "https://graph.instagram.com/me/media",
+                    params={"fields": "id,caption,media_url,permalink", "access_token": token},
+                )
+                data = r.json().get("data", [])
+                return [{"id": p["id"], "url": p.get("media_url"), "caption": p.get("caption", ""), "permalink": p.get("permalink")} for p in data[:6]]
+        except Exception as e:
+            log.warning(f"instagram fetch failed: {e}")
+    return INSTAGRAM_MOCK
+
+
+# ================================ SEO: sitemap + prerender ================================
+@app.get("/sitemap.xml")
+async def sitemap():
+    base = os.environ.get("PUBLIC_URL", "").rstrip("/")
+    urls = ["/", "/shop", "/pages/about", "/pages/faq", "/pages/shipping-returns", "/pages/privacy"]
+    products = await db.products.find({"status": "active"}, {"slug": 1, "_id": 0}).to_list(1000)
+    collections = await db.collections.find({}, {"slug": 1, "_id": 0}).to_list(200)
+    urls += [f"/product/{p['slug']}" for p in products]
+    urls += [f"/collections/{c['slug']}" for c in collections]
+    body = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    for u in urls:
+        body += f"  <url><loc>{base}{u}</loc></url>\n"
+    body += "</urlset>\n"
+    return Response(content=body, media_type="application/xml")
+
+
+@app.get("/robots.txt")
+async def robots():
+    base = os.environ.get("PUBLIC_URL", "")
+    return PlainTextResponse(f"User-agent: *\nAllow: /\nSitemap: {base.rstrip('/')}/sitemap.xml\n")
+
+
+BOT_UAS = ["googlebot", "bingbot", "yandex", "baiduspider", "twitterbot", "facebookexternalhit", "linkedinbot", "embedly", "pinterest", "slackbot", "whatsapp", "telegrambot", "duckduckbot", "applebot"]
+
+
+class PrerenderMiddleware(BaseHTTPMiddleware):
+    """Fetches prerender.io for crawler user-agents. Requires PRERENDER_TOKEN env."""
+
+    async def dispatch(self, request, call_next):
+        token = os.environ.get("PRERENDER_TOKEN")
+        ua = (request.headers.get("user-agent") or "").lower()
+        path = request.url.path
+        skip_paths = ("/api", "/sitemap.xml", "/robots.txt", "/static", "/manifest.json", "/service-worker.js")
+        if token and any(b in ua for b in BOT_UAS) and not any(path.startswith(s) for s in skip_paths):
+            try:
+                target = str(request.url)
+                async with httpx.AsyncClient(timeout=15) as client:
+                    r = await client.get(
+                        f"https://service.prerender.io/{target}",
+                        headers={"X-Prerender-Token": token, "User-Agent": ua},
+                    )
+                    return Response(content=r.content, status_code=r.status_code, media_type=r.headers.get("content-type", "text/html"))
+            except Exception as e:
+                log.warning(f"prerender fetch failed: {e}")
+        return await call_next(request)
+
+
+app.add_middleware(PrerenderMiddleware)
+
+
+@app.on_event("startup")
+async def _start_bg():
+    asyncio.create_task(_abandoned_cart_loop())
 
 
 # ============ Mount ============

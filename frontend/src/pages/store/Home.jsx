@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
 import { StoreHeader, StoreFooter } from "@/components/store/Chrome";
 
@@ -22,6 +23,31 @@ function ProductTile({ p }) {
   );
 }
 
+function InstagramFeed() {
+  const [items, setItems] = useState([]);
+  useEffect(() => { api.get("/instagram/feed").then((r) => setItems(r.data)); }, []);
+  if (items.length === 0) return null;
+  return (
+    <section className="max-w-7xl mx-auto px-6 pb-24" data-testid="instagram-feed">
+      <div className="flex items-end justify-between mb-8">
+        <div>
+          <div className="overline text-[color:var(--sf-text-soft)] mb-3">@loompastelco</div>
+          <h2 className="font-serif-display text-4xl font-light">From the atelier</h2>
+        </div>
+        <a href="https://instagram.com/loompastelco" target="_blank" rel="noreferrer" className="hover-underline text-sm">Follow us →</a>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4">
+        {items.slice(0, 6).map((p) => (
+          <a key={p.id} href={p.permalink} target="_blank" rel="noreferrer" className="relative aspect-square overflow-hidden group" data-testid={`ig-post-${p.id}`}>
+            <img src={p.url} alt={p.caption} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy" />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors" />
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
   const [products, setProducts] = useState([]);
   const [collections, setCollections] = useState([]);
@@ -31,6 +57,13 @@ export default function Home() {
   }, []);
   return (
     <div>
+      <Helmet>
+        <title>Loom & Pastel Co. — Hand-embroidered slow fashion</title>
+        <meta name="description" content="Mid-premium women's fusion wear, hand-embroidered co-ord sets and slow-fashion silhouettes from ateliers in India." />
+        <meta property="og:title" content="Loom & Pastel Co." />
+        <meta property="og:description" content="Hand-embroidered co-ord sets & slow-fashion pieces for the modern woman." />
+        <meta property="og:image" content="https://images.unsplash.com/photo-1702468508445-7510f972c37e?w=1200" />
+      </Helmet>
       <StoreHeader />
       {/* Hero */}
       <section className="relative" data-testid="hero-section">
@@ -104,6 +137,8 @@ export default function Home() {
           {products.map((p) => <ProductTile key={p.id} p={p} />)}
         </div>
       </section>
+
+      <InstagramFeed />
 
       <StoreFooter />
     </div>

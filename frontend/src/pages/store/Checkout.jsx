@@ -14,6 +14,11 @@ export default function Checkout() {
     name: user?.name || "", phone: "", email: user?.email || "",
     line1: "", line2: "", city: "", state: "", pincode: "", country: "IN",
   });
+
+  // Track shopper email for abandoned cart recovery
+  useEffect(() => {
+    if (address.email && address.email.includes("@")) localStorage.setItem("lp_shopper_email", address.email);
+  }, [address.email]);
   const [couponCode, setCouponCode] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("razorpay");
   const [quote, setQuote] = useState(null);
