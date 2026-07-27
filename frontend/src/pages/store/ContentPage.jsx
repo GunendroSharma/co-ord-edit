@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { StoreFooter, StoreHeader } from "@/components/store/Chrome";
+import { baseUrl } from "@/constants/testIds";
 import { api } from "@/lib/api";
-import { StoreHeader, StoreFooter } from "@/components/store/Chrome";
+import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 
 export default function ContentPage() {
   const { slug } = useParams();
   const [page, setPage] = useState(null);
-  useEffect(() => { api.get(`/pages/${slug}`).then((r) => setPage(r.data)).catch(() => setPage({ title: "Not found", body_html: "" })); }, [slug]);
+  useEffect(() => { api.get(`${baseUrl}/pages/${slug}`).then((r) => setPage(r.data)).catch(() => setPage({ title: "Not found", body_html: "" })); }, [slug]);
   return (
     <div>
       <StoreHeader />

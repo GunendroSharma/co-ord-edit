@@ -1,8 +1,9 @@
-import React from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
-import { ShoppingBag, Heart, User, Search, Menu, X } from "lucide-react";
-import { useCart } from "@/lib/cart";
+import { baseUrl } from "@/constants/testIds";
 import { useAuth } from "@/lib/auth";
+import { useCart } from "@/lib/cart";
+import { Heart, Menu, Search, ShoppingBag, User, X } from "lucide-react";
+import React from "react";
+import { Link, NavLink } from "react-router-dom";
 
 export function StoreHeader() {
   const { count, setDrawerOpen } = useCart();
@@ -63,7 +64,7 @@ export function StoreFooter() {
     e.preventDefault();
     try {
       const { api } = await import("@/lib/api");
-      await api.post("/newsletter", { email });
+      await api.post(`${baseUrl}/newsletter`, { email });
       setOk(true);
     } catch {}
   };

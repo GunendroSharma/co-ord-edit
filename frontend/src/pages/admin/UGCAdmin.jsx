@@ -1,24 +1,25 @@
-import React, { useEffect, useState } from "react";
+import { baseUrl } from "@/constants/testIds";
 import { api } from "@/lib/api";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 export function UGCAdmin() {
   const [items, setItems] = useState([]);
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState({ image_url: "", caption: "", author_handle: "", product_ids: [], approved: true });
-  const load = () => api.get("/admin/ugc").then((r) => setItems(r.data));
+  const load = () => api.get(`${baseUrl}/admin/ugc`).then((r) => setItems(r.data));
   useEffect(() => {
     load();
-    api.get("/admin/products").then((r) => setProducts(r.data));
+    api.get(`${baseUrl}/admin/products`).then((r) => setProducts(r.data));
   }, []);
   const create = async (e) => {
     e.preventDefault();
-    await api.post("/admin/ugc", form);
+    await api.post(`${baseUrl}/admin/ugc`, form);
     setForm({ image_url: "", caption: "", author_handle: "", product_ids: [], approved: true });
     load(); toast.success("Added");
   };
-  const toggle = async (p) => { await api.patch(`/admin/ugc/${p.id}`, { approved: !p.approved }); load(); };
-  const del = async (id) => { if (window.confirm("Remove this post?")) { await api.delete(`/admin/ugc/${id}`); load(); } };
+  const toggle = async (p) => { await api.patch(`${baseUrl}/admin/ugc/${p.id}`, { approved: !p.approved }); load(); };
+  const del = async (id) => { if (window.confirm("Remove this post?")) { await api.delete(`${baseUrl}/admin/ugc/${id}`); load(); } };
   const toggleProduct = (pid) => setForm({ ...form, product_ids: form.product_ids.includes(pid) ? form.product_ids.filter((x) => x !== pid) : [...form.product_ids, pid] });
 
   return (

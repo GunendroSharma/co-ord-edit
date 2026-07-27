@@ -1,13 +1,14 @@
-import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
+import { StoreFooter, StoreHeader } from "@/components/store/Chrome";
+import { baseUrl } from "@/constants/testIds";
 import { api } from "@/lib/api";
-import { StoreHeader, StoreFooter } from "@/components/store/Chrome";
+import { useEffect, useState } from "react";
+import { Helmet } from "react-helmet-async";
+import { Link } from "react-router-dom";
 
 export default function Gallery() {
   const [posts, setPosts] = useState([]);
   const [sel, setSel] = useState(null);
-  useEffect(() => { api.get("/ugc").then((r) => setPosts(r.data)); }, []);
+  useEffect(() => { api.get(`${baseUrl}/ugc`).then((r) => setPosts(r.data)); }, []);
   return (
     <div>
       <Helmet><title>Community Gallery — Loom & Pastel Co.</title><meta name="description" content="Real shoppers wearing Loom & Pastel Co. Tag @loompastelco to be featured." /></Helmet>

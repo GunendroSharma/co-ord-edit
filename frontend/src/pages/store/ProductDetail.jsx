@@ -1,16 +1,17 @@
-import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
-import { api } from "@/lib/api";
-import { useCart } from "@/lib/cart";
-import { useAuth } from "@/lib/auth";
-import { StoreHeader, StoreFooter } from "@/components/store/Chrome";
-import { Heart, Star } from "lucide-react";
-import { toast } from "sonner";
-import { ProductTile } from "./Home";
-import { SizeChartTrigger } from "@/components/store/SizeChart";
+import { StoreFooter, StoreHeader } from "@/components/store/Chrome";
 import { CompleteTheSet } from "@/components/store/CompleteTheSet";
 import { Reels } from "@/components/store/Reels";
+import { SizeChartTrigger } from "@/components/store/SizeChart";
+import { baseUrl } from "@/constants/testIds";
+import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { useCart } from "@/lib/cart";
+import { Heart, Star } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Helmet } from "react-helmet-async";
+import { useParams } from "react-router-dom";
+import { toast } from "sonner";
+import { ProductTile } from "./Home";
 
 export default function ProductDetail() {
   const { slug } = useParams();
@@ -23,11 +24,11 @@ export default function ProductDetail() {
   const { user } = useAuth();
 
   useEffect(() => {
-    api.get(`/products/${slug}`).then((r) => {
+    api.get(`${baseUrl}/products/${slug}`).then((r) => {
       setData(r.data);
       setSelVariant(r.data.product.variants[0]);
       setGallery(0);
-      api.get(`/products/${r.data.product.id}/reviews`).then((rr) => setReviews(rr.data));
+      api.get(`${baseUrl}/products/${r.data.product.id}/reviews`).then((rr) => setReviews(rr.data));
     });
   }, [slug]);
 
@@ -39,8 +40,8 @@ export default function ProductDetail() {
 
   const submitReview = async (e) => {
     e.preventDefault();
-    await api.post(`/products/${p.id}/reviews`, { ...newReview, name: newReview.name || user?.name || "Guest" });
-    const { data: revs } = await api.get(`/products/${p.id}/reviews`);
+    await api.post(`${baseUrl}/products/${p.id}/reviews`, { ...newReview, name: newReview.name || user?.name || "Guest" });
+    const { data: revs } = await api.get(`${baseUrl}/products/${p.id}/reviews`);
     setReviews(revs);
     setNewReview({ rating: 5, title: "", body: "", name: "" });
     toast.success("Review posted");

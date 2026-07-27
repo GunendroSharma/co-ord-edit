@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { StoreFooter, StoreHeader } from "@/components/store/Chrome";
+import { baseUrl } from "@/constants/testIds";
 import { api } from "@/lib/api";
-import { StoreHeader, StoreFooter } from "@/components/store/Chrome";
+import { useEffect, useState } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
 import { ProductTile } from "./Home";
 
 export default function Shop() {
@@ -18,17 +19,18 @@ export default function Shop() {
   useEffect(() => {
     const load = async () => {
       if (slug) {
-        const { data } = await api.get(`/collections/${slug}`);
+        const { data } = await api.get(`${baseUrl}/collections/${slug}`);
         setCollection(data.collection);
         setProducts(data.products);
         setTotal(data.products.length);
       } else {
+        setCollection(null);
         const qs = new URLSearchParams();
         if (q) qs.set("q", q);
         if (sort) qs.set("sort", sort);
         if (minPrice) qs.set("min_price", minPrice);
         if (maxPrice) qs.set("max_price", maxPrice);
-        const { data } = await api.get(`/products?${qs.toString()}`);
+        const { data } = await api.get(`${baseUrl}/products?${qs.toString()}`);
         setProducts(data.items); setTotal(data.total);
       }
     };

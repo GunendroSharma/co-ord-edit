@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import { baseUrl } from "@/constants/testIds";
 import { api } from "@/lib/api";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 export function Media() {
@@ -10,7 +11,7 @@ export function Media() {
     e.preventDefault();
     const kind = isVideoUrl(url) ? "video" : "image";
     const ext = url.split("?")[0].split(".").pop() || (kind === "video" ? "mp4" : "jpg");
-    const { data } = await api.post("/imagekit/mock-upload", { url, filename: `media-${Date.now()}.${ext}` });
+    const { data } = await api.post(`${baseUrl}/imagekit/mock-upload`, { url, filename: `media-${Date.now()}.${ext}` });
     const entry = { ...data, kind: data.kind || kind };
     const next = [entry, ...uploads];
     setUploads(next); localStorage.setItem("lp_media_log", JSON.stringify(next));
@@ -46,10 +47,10 @@ export function Media() {
 export function Emails() {
   const [items, setItems] = useState([]);
   const [sel, setSel] = useState(null);
-  const load = () => api.get("/admin/email-templates").then((r) => { setItems(r.data); if (!sel && r.data[0]) setSel(r.data[0]); });
+  const load = () => api.get(`${baseUrl}/admin/email-templates`).then((r) => { setItems(r.data); if (!sel && r.data[0]) setSel(r.data[0]); });
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
-  const save = async () => { await api.patch(`/admin/email-templates/${sel.key}`, sel); toast.success("Saved"); load(); };
-  const test = async () => { await api.post(`/admin/email-templates/${sel.key}/test`, {}); toast.success("Test email dispatched (mock provider prints to backend log)"); };
+  const save = async () => { await api.patch(`${baseUrl}/admin/email-templates/${sel.key}`, sel); toast.success("Saved"); load(); };
+  const test = async () => { await api.post(`${baseUrl}/admin/email-templates/${sel.key}/test`, {}); toast.success("Test email dispatched (mock provider prints to backend log)"); };
   return (
     <div data-testid="admin-emails" className="grid grid-cols-1 md:grid-cols-3 gap-6">
       <div className="bg-white border rounded-md">
@@ -83,9 +84,9 @@ export function Emails() {
 export function Pages() {
   const [items, setItems] = useState([]);
   const [sel, setSel] = useState(null);
-  const load = () => api.get("/admin/pages").then((r) => setItems(r.data));
+  const load = () => api.get(`${baseUrl}/admin/pages`).then((r) => setItems(r.data));
   useEffect(() => { load(); }, []);
-  const save = async () => { await api.patch(`/admin/pages/${sel.slug}`, sel); toast.success("Saved"); load(); };
+  const save = async () => { await api.patch(`${baseUrl}/admin/pages/${sel.slug}`, sel); toast.success("Saved"); load(); };
   return (
     <div data-testid="admin-pages" className="grid grid-cols-1 md:grid-cols-3 gap-6">
       <div className="bg-white border rounded-md">
@@ -109,8 +110,8 @@ export function Analytics() {
   const [k, setK] = useState(null);
   const [reels, setReels] = useState(null);
   useEffect(() => {
-    api.get("/admin/analytics").then((r) => setK(r.data));
-    api.get("/admin/analytics/reels").then((r) => setReels(r.data));
+    api.get(`${baseUrl}/admin/analytics`).then((r) => setK(r.data));
+    api.get(`${baseUrl}/admin/analytics/reels`).then((r) => setReels(r.data));
   }, []);
   return (
     <div data-testid="admin-analytics">
@@ -179,9 +180,9 @@ export function Analytics() {
 
 export function Settings() {
   const [s, setS] = useState(null);
-  useEffect(() => { api.get("/admin/settings").then((r) => setS(r.data)); }, []);
+  useEffect(() => { api.get(`${baseUrl}/admin/settings`).then((r) => setS(r.data)); }, []);
   if (!s) return <div>Loading…</div>;
-  const save = async () => { await api.patch("/admin/settings", s); toast.success("Saved"); };
+  const save = async () => { await api.patch(`${baseUrl}/admin/settings`, s); toast.success("Saved"); };
   return (
     <div data-testid="admin-settings" className="max-w-2xl">
       <h1 className="text-2xl font-admin-head mb-6">Store settings</h1>
@@ -214,10 +215,10 @@ function F({ label, children }) {
 export function Collections() {
   const [items, setItems] = useState([]);
   const [form, setForm] = useState({ title: "", slug: "", description: "", hero_image: "" });
-  const load = () => api.get("/admin/collections").then((r) => setItems(r.data));
+  const load = () => api.get(`${baseUrl}/admin/collections`).then((r) => setItems(r.data));
   useEffect(() => { load(); }, []);
-  const create = async (e) => { e.preventDefault(); await api.post("/admin/collections", form); setForm({ title: "", slug: "", description: "", hero_image: "" }); load(); toast.success("Created"); };
-  const del = async (id) => { await api.delete(`/admin/collections/${id}`); load(); };
+  const create = async (e) => { e.preventDefault(); await api.post(`${baseUrl}/admin/collections`, form); setForm({ title: "", slug: "", description: "", hero_image: "" }); load(); toast.success("Created"); };
+  const del = async (id) => { await api.delete(`${baseUrl}/admin/collections/${id}`); load(); };
   return (
     <div data-testid="admin-collections">
       <h1 className="text-2xl font-admin-head mb-6">Collections</h1>

@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from "react";
+import { baseUrl } from "@/constants/testIds";
 import { api } from "@/lib/api";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 export function AbandonedCarts() {
   const [items, setItems] = useState([]);
-  const load = () => api.get("/admin/abandoned-carts").then((r) => setItems(r.data));
+  const load = () => api.get(`${baseUrl}/admin/abandoned-carts`).then((r) => setItems(r.data));
   useEffect(() => { load(); }, []);
-  const remind = async (id) => { await api.post(`/admin/abandoned-carts/${id}/remind`); toast.success("Reminder sent"); load(); };
+  const remind = async (id) => { await api.post(`${baseUrl}/admin/abandoned-carts/${id}/remind`); toast.success("Reminder sent"); load(); };
   return (
     <div data-testid="admin-abandoned-carts">
       <h1 className="text-2xl font-admin-head mb-2">Abandoned Carts</h1>
